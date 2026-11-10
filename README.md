@@ -1,6 +1,6 @@
-# RECOVR — Autonomous B2B Receivables Recovery Platform
+# ScalePods — Autonomous B2B Receivables Recovery Platform
 
-> **Powered by [ScalePods](https://www.scalepods.co/)**  
+> **[ScalePods](https://www.scalepods.co/)**  
 > An autonomous B2B debt recovery and dunning intelligence system designed to help CFOs, credit controllers, and finance teams recover locked cash flow without awkward collection calls or damaging client relationships.
 
 ---
@@ -113,7 +113,7 @@ recovr-landing-page/
 │   ├── main.tsx                # Application bootstrap
 │   ├── index.css               # Global typography and base styles
 │   ├── components/             # Marketing landing page components
-│   │   ├── Navbar.tsx          # Top navigation with RECOVR / ScalePods brand
+│   │   ├── Navbar.tsx          # Top navigation with ScalePods brand
 │   │   ├── HeroSection.tsx     # Hero section with kinetic settlement graphic
 │   │   ├── PricingSection.tsx  # Dynamic plan tier selection
 │   │   ├── Footer.tsx          # Landing footer with certified compliance badges
@@ -151,4 +151,4 @@ recovr-landing-page/
 
 ## 📄 License
 
-Proprietary © RECOVR Technologies & [ScalePods](https://www.scalepods.co/). All rights reserved.
+Proprietary © [ScalePods](https://www.scalepods.co/). All rights reserved.

@@ -10,21 +10,12 @@ export const Footer: React.FC = () => {
           
           {/* Brand Col */}
           <div className="col-span-2 space-y-3">
-            <div className="flex flex-col">
-              <span className="font-extrabold text-xl tracking-[0.18em] text-white font-sans leading-tight">
-                RECOVR
-              </span>
-              <span className="text-[10px] font-mono tracking-wider text-zinc-400 leading-none mt-1">
-                Powered by{' '}
-                <a
-                  href="https://www.scalepods.co/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-purple-400 hover:text-purple-300 hover:underline transition-colors"
-                >
-                  ScalePods
-                </a>
-              </span>
+            <div className="flex items-center">
+              <img
+                src="/scalepods-logo-white.png"
+                alt="ScalePods"
+                className="h-7 w-auto object-contain"
+              />
             </div>
             
             <p className="text-xs sm:text-sm text-zinc-400 max-w-sm leading-relaxed">
@@ -84,7 +75,7 @@ export const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-zinc-500">
           <div>
-            © {new Date().getFullYear()} RECOVR Technologies Pvt Ltd. All rights reserved.
+            © {new Date().getFullYear()} ScalePods Technologies. All rights reserved.
           </div>
           <div className="flex items-center gap-2">
             <span>Built for Modern Indian & Global Finance Teams</span>

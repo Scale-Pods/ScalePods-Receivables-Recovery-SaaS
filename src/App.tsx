@@ -137,7 +137,7 @@ export function App() {
         {/* 2. Four-Pillar Wireframe Architecture */}
         <ArchitectureSection />
 
-        {/* 3. Enterprise Benchmark Matrix (RECOVR vs Agencies vs Manual Excel) */}
+        {/* 3. Enterprise Benchmark Matrix (Autonomous vs Agencies vs Manual Excel) */}
         <ComparisonTable />
 
         {/* 4. Minimal Transparent Pricing with 4 BRD Tiers and Purchase capability */}

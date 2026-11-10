@@ -354,7 +354,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
         )}
 
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-400">
-          <span className="font-mono">RECOVR Engine</span>
+          <span className="font-mono">Autonomous Engine</span>
           <button
             onClick={onClose}
             className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"

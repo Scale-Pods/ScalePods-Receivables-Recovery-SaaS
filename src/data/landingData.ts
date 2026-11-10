@@ -283,7 +283,7 @@ export const testimonials: Testimonial[] = [
     company: 'Zenith Logistics Infra Pvt Ltd',
     avatarInitials: 'SS',
     avatarBg: 'bg-[#C85A2A]',
-    quote: 'Before RECOVR, our average DSO was 64 days and our finance team spent half their week writing polite reminder emails. Within our first 45 days on RECOVR, we unlocked ₹3.8 Crores in overdue cash with zero customer pushback.',
+    quote: 'Before implementing this platform, our average DSO was 64 days and our finance team spent half their week writing polite reminder emails. Within our first 45 days, we unlocked ₹3.8 Crores in overdue cash with zero customer pushback.',
     statHighlight: 'DSO slashed by 28 days'
   },
   {
@@ -301,15 +301,15 @@ export const testimonials: Testimonial[] = [
     company: 'Vortex Media Interactive LLP',
     avatarInitials: 'VM',
     avatarBg: 'bg-[#311E28]',
-    quote: 'Traditional debt collectors damage your brand. RECOVR’s AI agent handles disputes gracefully, automatically pauses when a client raises a valid PO question, and gets the invoice cleared without damaging executive relationships.',
+    quote: 'Traditional debt collectors damage your brand. This autonomous AI agent handles disputes gracefully, automatically pauses when a client raises a valid PO question, and gets the invoice cleared without damaging executive relationships.',
     statHighlight: '100% client retention preserved'
   }
 ];
 
 export const faqs: FaqItem[] = [
   {
-    question: 'How does RECOVR integrate with existing ERP & accounting ledgers?',
-    answer: 'RECOVR connects directly via modern REST APIs and webhooks with SAP, Zoho Books, QuickBooks, and custom accounting ledgers. Invoices are ingested the moment they are generated, and reconciled instantly upon payment.'
+    question: 'How does the platform integrate with existing ERP & accounting ledgers?',
+    answer: 'The platform connects directly via modern REST APIs and webhooks with SAP, Zoho Books, QuickBooks, and custom accounting ledgers. Invoices are ingested the moment they are generated, and reconciled instantly upon payment.'
   },
   {
     question: 'Will automated outreach damage our client relationships?',
@@ -321,7 +321,7 @@ export const faqs: FaqItem[] = [
   },
   {
     question: 'What is the Day 22 Escalation feature?',
-    answer: 'If an invoice remains overdue past 21 days across all touchpoints, RECOVR drafts a formal Advocate Notice of Demand compliant with Section 138 / MSME Samadhaan. Nothing is ever dispatched without your explicit one-click approval.'
+    answer: 'If an invoice remains overdue past 21 days across all touchpoints, the platform drafts a formal Advocate Notice of Demand compliant with Section 138 / MSME Samadhaan. Nothing is ever dispatched without your explicit one-click approval.'
   },
   {
     question: 'Is financial and customer data secure and compliant?',

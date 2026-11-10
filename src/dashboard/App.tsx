@@ -1130,7 +1130,11 @@ export function DashboardView({
         <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#07080D] py-4 text-xs text-zinc-500 mt-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 font-mono">
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100">RECOVR</span>
+              <img
+                src={isDark ? '/scalepods-logo-white.png' : '/scalepods-logo-dark.png'}
+                alt="ScalePods"
+                className="h-3.5 w-auto object-contain"
+              />
               <span>• Receivables Recovery System</span>
             </div>
           </div>

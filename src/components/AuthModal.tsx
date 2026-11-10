@@ -166,10 +166,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Modal Header */}
         <div className="mb-5">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-extrabold text-lg tracking-[0.18em] text-white font-sans">
-              RECOVR
-            </span>
+          <div className="flex items-center gap-2 mb-2">
+            <img
+              src="/scalepods-logo-white.png"
+              alt="ScalePods"
+              className="h-5 w-auto object-contain"
+            />
           </div>
           <h2 className="text-xl font-bold text-white tracking-tight">
             {mode === 'signup' ? 'Create Account' : 'Log In'}

@@ -14,11 +14,11 @@ export const ComparisonTable: React.FC = () => {
           </div>
 
           <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-            Why Modern CFOs Choose RECOVR.
+            Why Modern CFOs Choose Autonomous Recovery.
           </h2>
 
           <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-            Side-by-side matrix comparing RECOVR vs. Traditional Collection Agencies vs. Manual Excel follow-ups.
+            Side-by-side matrix comparing Our Platform vs. Traditional Collection Agencies vs. Manual Excel follow-ups.
           </p>
         </div>
 
@@ -37,7 +37,7 @@ export const ComparisonTable: React.FC = () => {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-purple-400" />
-                        <span>RECOVR</span>
+                        <span>Autonomous Engine</span>
                       </div>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-normal">
                         Autonomous
@@ -64,7 +64,7 @@ export const ComparisonTable: React.FC = () => {
                       {row.criteria}
                     </td>
 
-                    {/* RECOVR (Highlighted) */}
+                    {/* Autonomous Engine (Highlighted) */}
                     <td className="py-4.5 px-6 font-semibold text-emerald-400 bg-purple-600/5 border-x border-purple-500/20">
                       <div className="flex items-start gap-2">
                         <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />

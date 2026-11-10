@@ -39,7 +39,7 @@ export const OmnichannelSimulatorBlock: React.FC<OmnichannelSimulatorBlockProps>
     {
       id: 'msg-1',
       sender: 'ai',
-      text: 'Namaste Rajesh ji. This is Sarah from Accounts. GST Invoice INV-2024-8842 for ₹1,84,000 is 18 days past due. Settle securely via Razorpay UPI / NEFT: https://pay.recovr.io/inv-8842. Reply "PAID" if already remitted.',
+      text: 'Namaste Rajesh ji. This is Sarah from Accounts. GST Invoice INV-2024-8842 for ₹1,84,000 is 18 days past due. Settle securely via Razorpay UPI / NEFT: https://pay.scalepods.co/inv-8842. Reply "PAID" if already remitted.',
       timestamp: '09:14 AM',
     },
   ]);
@@ -58,7 +58,7 @@ export const OmnichannelSimulatorBlock: React.FC<OmnichannelSimulatorBlockProps>
 
     if (preset === 'paid') {
       customerText = 'I have already paid this morning by NEFT through HDFC Bank.';
-      aiResponse = 'Thank you, Rajesh ji! Reminders are paused for 3 business days while accounts reconciles the bank UTR. Upload remittance slip if handy: https://pay.recovr.io/proof-8842';
+      aiResponse = 'Thank you, Rajesh ji! Reminders are paused for 3 business days while accounts reconciles the bank UTR. Upload remittance slip if handy: https://pay.scalepods.co/proof-8842';
       actionNotice = '3-Day Hold Active';
     } else if (preset === 'installment') {
       customerText = 'Can we pay 50% (₹92,000) today via RTGS and clear the remainder next Friday?';
@@ -70,7 +70,7 @@ export const OmnichannelSimulatorBlock: React.FC<OmnichannelSimulatorBlockProps>
       actionNotice = 'Dispute Ticket Logged';
     } else {
       customerText = 'Please resend checkout link for corporate card / UPI.';
-      aiResponse = 'Here is your link: https://pay.recovr.io/inv-8842 (UPI, NetBanking, NEFT virtual account & Cards supported with instant GST receipt).';
+      aiResponse = 'Here is your link: https://pay.scalepods.co/inv-8842 (UPI, NetBanking, NEFT virtual account & Cards supported with instant GST receipt).';
       actionNotice = 'Checkout Link Sent';
     }
 
@@ -116,7 +116,7 @@ export const OmnichannelSimulatorBlock: React.FC<OmnichannelSimulatorBlockProps>
 
     setTimeout(() => {
       setIsAiTyping(false);
-      let reply = 'Logged your reply. View statement or settle online via Razorpay: https://pay.recovr.io/inv-8842';
+      let reply = 'Logged your reply. View statement or settle online via Razorpay: https://pay.scalepods.co/inv-8842';
       let tag = 'Reply Logged';
       if (userText.toLowerCase().includes('paid') || userText.toLowerCase().includes('transfer') || userText.toLowerCase().includes('neft') || userText.toLowerCase().includes('rtgs')) {
         reply = 'Reminders paused for 3 business days pending bank UTR verification.';

@@ -49,25 +49,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex items-center justify-between">
         
-        {/* Brand Logo - Exact RECOVR typography */}
-        <div className="flex flex-col select-none">
-          <a href="#" className="flex items-center group cursor-pointer">
-            <span className="font-extrabold text-xl tracking-[0.18em] text-white font-sans group-hover:text-purple-400 transition-colors leading-tight">
-              RECOVR
-            </span>
-          </a>
-          <span className="text-[10px] font-mono tracking-wider text-zinc-400 leading-none mt-0.5">
-            Powered by{' '}
-            <a
-              href="https://www.scalepods.co/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold text-purple-400 hover:text-purple-300 hover:underline transition-colors"
-            >
-              ScalePods
-            </a>
-          </span>
-        </div>
+        {/* Brand Logo - ScalePods */}
+        <a href="#" className="flex items-center group cursor-pointer select-none">
+          <img
+            src="/scalepods-logo-white.png"
+            alt="ScalePods"
+            className="h-6 w-auto object-contain transition-opacity group-hover:opacity-90"
+          />
+        </a>
 
         {/* Desktop Navigation Links */}
         <div className="hidden md:flex items-center gap-7">

@@ -80,9 +80,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => setActiveTab('overview')}
               className="flex items-center cursor-pointer select-none"
             >
-              <span className="font-extrabold text-lg sm:text-xl tracking-[0.16em] text-zinc-900 dark:text-white font-sans">
-                RECOVR
-              </span>
+              <img
+                src={isDark ? '/scalepods-logo-white.png' : '/scalepods-logo-dark.png'}
+                alt="ScalePods"
+                className="h-5 w-auto object-contain"
+              />
             </div>
 
             <button
@@ -98,11 +100,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="w-full flex items-center justify-between">
             <button
               onClick={() => setActiveTab('overview')}
-              className="w-7 h-7 rounded-md flex items-center justify-center font-extrabold text-base text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
-              title="RECOVR Dashboard"
-              aria-label="RECOVR Dashboard"
+              className="w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs font-mono text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0 border border-zinc-200 dark:border-zinc-800"
+              title="ScalePods Dashboard"
+              aria-label="ScalePods Dashboard"
             >
-              R
+              SP
             </button>
 
             <button

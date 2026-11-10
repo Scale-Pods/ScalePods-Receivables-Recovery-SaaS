@@ -402,7 +402,7 @@ export const GlowingOrbitalHeroGraphic: React.FC = () => {
             filter="url(#neonGlowIntense)"
           />
 
-          {/* 8. Crisp Geometric RECOVR "R" Monogram (Faithful to Screenshot) */}
+          {/* 8. Crisp Geometric Monogram Centerpiece */}
           <g transform="translate(330, 234)">
             
             {/* Soft Shadow behind glyph */}

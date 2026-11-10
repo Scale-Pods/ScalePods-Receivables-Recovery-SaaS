@@ -209,3 +209,17 @@ export interface BusinessEntity {
   recoveredThisMonth: number;
   collectionRate: number;
 }
+
+export interface PaymentRecord {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  customerName: string;
+  customerCompany: string;
+  amount: number;
+  paymentMethod: string;
+  bankReference: string;
+  proofUrl?: string;
+  status: 'verified' | 'pending';
+  settledAt: string;
+}

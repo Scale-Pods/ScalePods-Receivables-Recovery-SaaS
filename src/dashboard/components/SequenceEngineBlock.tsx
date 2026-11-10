@@ -3,14 +3,11 @@ import {
   Mail, 
   MessageSquare, 
   PhoneCall, 
-  CheckCircle2, 
   ShieldCheck, 
-  Clock, 
-  AlertTriangle,
   Play,
   Pause
 } from 'lucide-react';
-import { PlanTier, CadenceIntensity } from '../types/dashboard';
+import { PlanTier } from '../types/dashboard';
 
 interface SequenceDayStep {
   day: number;
@@ -138,7 +135,6 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
   planTier,
   onUpgradePrompt,
 }) => {
-  const [selectedCadence, setSelectedCadence] = useState<CadenceIntensity>('standard');
   const [activeDay, setActiveDay] = useState<number>(1);
   const [previewBucket, setPreviewBucket] = useState<'early' | '15+' | '30+' | '60+'>('early');
 
@@ -162,7 +158,7 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">21-Day Sequence Engine</h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Autonomous follow-up cadence from Day 1 to Day 21.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Autonomous follow-up sequence from Day 1 to Day 21.</p>
         </div>
 
         {/* Bucket Shortcuts */}
@@ -181,57 +177,6 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Cadence Selector Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {[
-          {
-            id: 'light',
-            name: 'Light Cadence',
-            target: 'Reliable (Score 80–100)',
-            desc: 'Email weekly, gentle tone. Standard for prompt payers.',
-            tier: 'Free, Basic, Growth, Ent',
-          },
-          {
-            id: 'standard',
-            name: 'Standard Cadence',
-            target: 'Watch & Default New',
-            desc: 'Email + WhatsApp every 3–4 days. System default.',
-            tier: 'Basic, Growth, Ent',
-          },
-          {
-            id: 'intensive',
-            name: 'Intensive Cadence',
-            target: 'High Risk (2+ Overdue)',
-            desc: 'Email + WhatsApp + Voice. Daily blitz Days 17–21.',
-            tier: 'Growth & Ent',
-          },
-        ].map((c) => {
-          const isSelected = selectedCadence === c.id;
-          return (
-            <div
-              key={c.id}
-              onClick={() => setSelectedCadence(c.id as CadenceIntensity)}
-              className={`rounded-xl p-3.5 cursor-pointer transition-all border ${
-                isSelected
-                  ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-[#0E0F17] shadow-sm'
-                  : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] hover:border-zinc-300 dark:hover:border-zinc-700'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-xs text-zinc-900 dark:text-white">{c.name}</span>
-                {isSelected && <span className="w-2 h-2 rounded-full bg-zinc-900 dark:bg-white" />}
-              </div>
-              <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 mb-1">{c.target}</div>
-              <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mb-2">{c.desc}</p>
-              <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono pt-1.5 border-t border-zinc-200 dark:border-zinc-800 flex justify-between">
-                <span>Tier:</span>
-                <span className="text-zinc-700 dark:text-zinc-300 font-medium">{c.tier}</span>
-              </div>
-            </div>
-          );
-        })}
       </div>
 
       {/* Stepper & Inspector */}
@@ -327,41 +272,6 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Safety Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-        <div className="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] shadow-sm">
-          <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold mb-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Never Chase Paid</span>
-          </div>
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400">Razorpay webhook halts outreach immediately.</div>
-        </div>
-
-        <div className="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] shadow-sm">
-          <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-semibold mb-1">
-            <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            <span>3-Day Hold</span>
-          </div>
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400">"I have paid" pauses outreach 3 business days.</div>
-        </div>
-
-        <div className="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] shadow-sm">
-          <div className="flex items-center gap-1.5 text-zinc-800 dark:text-zinc-200 font-semibold mb-1">
-            <Clock className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
-            <span>Calling Hours</span>
-          </div>
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400">Strict 9:00 AM – 7:00 PM local customer time.</div>
-        </div>
-
-        <div className="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] shadow-sm">
-          <div className="flex items-center gap-1.5 text-rose-700 dark:text-rose-400 font-semibold mb-1">
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-            <span>Dispute Isolation</span>
-          </div>
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400">Pauses only the disputed amount.</div>
         </div>
       </div>
     </div>

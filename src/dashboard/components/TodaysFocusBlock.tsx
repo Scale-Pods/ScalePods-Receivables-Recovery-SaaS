@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { FocusItem, PlanTier } from '../types/dashboard';
 import { formatINR } from '../utils/formatters';
+import { CompanyAvatar } from './CompanyAvatar';
 
 interface TodaysFocusBlockProps {
   items: FocusItem[];
@@ -86,27 +87,30 @@ export const TodaysFocusBlock: React.FC<TodaysFocusBlockProps> = ({
                 key={item.id}
                 className="py-3.5 first:pt-1 last:pb-1 flex flex-col md:flex-row md:items-center justify-between gap-3"
               >
-                {/* Left Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${getBadgeStyle(item.badgeVariant)}`}>
-                      {item.badgeText}
-                    </span>
-                    <span className="text-xs font-semibold font-mono text-zinc-900 dark:text-white">
-                      {formatINR(item.amount)}
-                    </span>
-                    <span className="text-zinc-400">•</span>
-                    <span className="text-xs text-zinc-600 dark:text-zinc-300 font-medium truncate">
-                      {item.customerName} ({item.company})
-                    </span>
-                    <span className="text-zinc-400 font-mono text-[10px] hidden sm:inline">
-                      • {item.invoiceId}
-                    </span>
-                  </div>
+                {/* Left Info with Company Avatar */}
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <CompanyAvatar name={item.company} size="sm" className="mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${getBadgeStyle(item.badgeVariant)}`}>
+                        {item.badgeText}
+                      </span>
+                      <span className="text-xs font-semibold font-mono text-zinc-900 dark:text-white">
+                        {formatINR(item.amount)}
+                      </span>
+                      <span className="text-zinc-400">•</span>
+                      <span className="text-xs text-zinc-600 dark:text-zinc-300 font-medium truncate">
+                        {item.customerName} ({item.company})
+                      </span>
+                      <span className="text-zinc-400 font-mono text-[10px] hidden sm:inline">
+                        • {item.invoiceId}
+                      </span>
+                    </div>
 
-                  <p className="text-xs text-zinc-600 dark:text-zinc-300 font-normal leading-relaxed">
-                    {item.description}
-                  </p>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-300 font-normal leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Right Actions */}

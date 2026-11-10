@@ -15,9 +15,11 @@ import {
   Invoice, 
   AgeingBucketId, 
   InvoiceStatus, 
-  PlanTier
+  PlanTier,
+  PaymentRecord
 } from '../types/dashboard';
 import { formatINR } from '../utils/formatters';
+import { CompanyAvatar } from './CompanyAvatar';
 
 interface LedgerTableBlockProps {
   invoices: Invoice[];
@@ -32,6 +34,7 @@ interface LedgerTableBlockProps {
   onChangeBucket: (invoice: Invoice) => void;
   onAnswerTicket: (invoice: Invoice) => void;
   onInspectRisk: (invoice: Invoice) => void;
+  payments?: PaymentRecord[];
 }
 
 export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
@@ -42,14 +45,23 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
   onMarkPaid,
   onViewProof,
   onInspectRisk,
+  payments = [],
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewTab, setViewTab] = useState<'active' | 'settled'>('active');
   const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all');
   const [sortField, setSortField] = useState<'dueDate' | 'amount' | 'riskScore'>('dueDate');
   const [sortAsc, setSortAsc] = useState(false);
 
+  const activeInvoices = invoices.filter((i) => i.status !== 'paid' && i.currentStage !== 'Done');
+  const settledInvoices = invoices.filter((i) => i.status === 'paid' || i.currentStage === 'Done');
+
   // Filter invoices
   const filtered = invoices.filter((inv) => {
+    const isPaid = inv.status === 'paid' || inv.currentStage === 'Done';
+    if (viewTab === 'active' && isPaid) return false;
+    if (viewTab === 'settled' && !isPaid) return false;
+
     if (selectedBucket !== 'all' && inv.bucket !== selectedBucket) return false;
     if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
     if (searchTerm.trim()) {
@@ -189,42 +201,59 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
     }
   };
 
-  // Avatar generator matching reference mockup
-  const getCompanyAvatar = (name: string, index: number = 0) => {
-    const avatars = [
-      { bg: 'bg-[#C85A2A]', text: 'text-white', letter: 'C' },
-      { bg: 'bg-[#2E5B88]', text: 'text-white', letter: 'C' },
-      { bg: 'bg-[#1D253A]', text: 'text-cyan-300', letter: 'CO' },
-      { bg: 'bg-[#311E28]', text: 'text-rose-300', letter: 'CD' },
-      { bg: 'bg-[#1F3A2E]', text: 'text-emerald-300', letter: 'A' },
-      { bg: 'bg-[#352516]', text: 'text-amber-300', letter: 'N' },
-      { bg: 'bg-[#2E1F38]', text: 'text-purple-300', letter: 'V' },
-      { bg: 'bg-[#24352D]', text: 'text-teal-300', letter: 'S' },
-      { bg: 'bg-[#32231F]', text: 'text-orange-300', letter: 'Z' },
-      { bg: 'bg-[#1F2B38]', text: 'text-sky-300', letter: 'K' },
-    ];
-    const item = avatars[index % avatars.length];
-    return (
-      <div 
-        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 select-none shadow-xs ${item.bg} ${item.text}`}
-        title={name}
-      >
-        {item.letter}
-      </div>
-    );
-  };
-
   return (
     <section className="space-y-4">
+      {/* View Switcher: Active Receivables vs Settled & Paid History */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-[#0D0E15] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <button
+            onClick={() => {
+              setViewTab('active');
+              setStatusFilter('all');
+            }}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              viewTab === 'active'
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span>Active Receivables (Pending)</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+              {activeInvoices.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setViewTab('settled');
+              setStatusFilter('all');
+            }}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              viewTab === 'settled'
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>Settled & Paid Archive</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+              {settledInvoices.length}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Top Filter & Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white dark:bg-[#0D0E15] p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800">
         
         {/* Bucket filter buttons */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
           {(['all', 'early', '15+', '30+', '60+'] as AgeingBucketId[]).map((b) => {
+            const currentScopeInvoices = viewTab === 'active' ? activeInvoices : settledInvoices;
             const count = b === 'all' 
-              ? invoices.length 
-              : invoices.filter(i => i.bucket === b).length;
+              ? currentScopeInvoices.length 
+              : currentScopeInvoices.filter(i => i.bucket === b).length;
 
             return (
               <button
@@ -236,7 +265,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                     : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-transparent hover:border-zinc-300 dark:hover:border-zinc-700'
                 }`}
               >
-                <span>{b === 'all' ? 'All Invoices' : b}</span>
+                <span>{b === 'all' ? (viewTab === 'active' ? 'All Active' : 'All Settled') : b}</span>
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/20 text-current">
                   {count}
                 </span>
@@ -258,19 +287,24 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
             />
           </div>
 
-          <select
-            aria-label="Filter status"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="paused">3-Day Hold</option>
-            <option value="disputed">Disputed</option>
-            <option value="promise">Promised</option>
-            <option value="paid">Settled</option>
-          </select>
+          {viewTab === 'active' ? (
+            <select
+              aria-label="Filter status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
+            >
+              <option value="all">All Active States</option>
+              <option value="active">Active</option>
+              <option value="paused">3-Day Hold</option>
+              <option value="disputed">Disputed</option>
+              <option value="promise">Promised</option>
+            </select>
+          ) : (
+            <div className="px-2.5 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-lg whitespace-nowrap">
+              Settled Archive
+            </div>
+          )}
 
           <select
             aria-label="Sort ledger"
@@ -314,7 +348,9 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
               {sorted.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-zinc-500 text-sm">
-                    No matching invoices found in this view.
+                    {viewTab === 'settled'
+                      ? 'No settled payments found in this filter.'
+                      : 'No active overdue invoices found in this view.'}
                   </td>
                 </tr>
               ) : (
@@ -330,7 +366,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                       {/* Customer / Company - Monogram avatar + details */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          {getCompanyAvatar(inv.customerCompany, idx)}
+                          <CompanyAvatar name={inv.customerCompany} logoUrl={inv.avatarUrl} size="md" />
                           <div className="min-w-0">
                             <div className="font-semibold text-zinc-900 dark:text-white text-sm truncate">
                               {inv.customerCompany}
@@ -371,17 +407,31 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                         {getStatusBadge(inv.status, inv.currentStage)}
                       </td>
 
-                      {/* Last Touch - Neutral icons & text */}
+                      {/* Last Touch or Payment Settlement Record */}
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-                          {getChannelIcon(inv.lastTouch.channel)}
-                          <span className="truncate max-w-[150px] text-xs font-medium" title={inv.lastTouch.action}>
-                            {inv.lastTouch.action}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
-                          {inv.lastTouch.timestamp}
-                        </div>
+                        {isPaid ? (
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{payments.find((p) => p.invoiceId === inv.id || p.invoiceNumber === inv.invoiceNumber)?.paymentMethod || 'Bank Wire (RTGS)'}</span>
+                            </div>
+                            <div className="text-[11px] text-zinc-500 font-mono mt-0.5 truncate">
+                              Ref: {payments.find((p) => p.invoiceId === inv.id || p.invoiceNumber === inv.invoiceNumber)?.bankReference || 'Confirmed & Cleared'}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
+                              {getChannelIcon(inv.lastTouch.channel)}
+                              <span className="truncate max-w-[150px] text-xs font-medium" title={inv.lastTouch.action}>
+                                {inv.lastTouch.action}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                              {inv.lastTouch.timestamp}
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* Actions */}

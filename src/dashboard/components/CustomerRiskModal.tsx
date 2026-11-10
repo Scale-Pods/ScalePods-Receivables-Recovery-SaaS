@@ -11,6 +11,7 @@ import {
   CustomerRiskTier, 
   CadenceIntensity 
 } from '../types/dashboard';
+import { CompanyAvatar } from './CompanyAvatar';
 
 interface CustomerRiskModalProps {
   customer: CustomerProfile | null;
@@ -68,21 +69,24 @@ export const CustomerRiskModal: React.FC<CustomerRiskModalProps> = ({
         
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-base text-zinc-900 dark:text-white">
-                Customer Risk & Dunning Cadence
-              </h3>
-              {customer.isLockedByOwner && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                  <Lock className="w-2.5 h-2.5 text-amber-500" />
-                  Owner Locked
-                </span>
-              )}
+          <div className="flex items-center gap-3">
+            <CompanyAvatar name={customer.company} size="lg" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-base text-zinc-900 dark:text-white">
+                  {customer.company}
+                </h3>
+                {customer.isLockedByOwner && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                    <Lock className="w-2.5 h-2.5 text-amber-500" />
+                    Owner Locked
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                {customer.primaryContact} • {customer.email}
+              </p>
             </div>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              {customer.company} • {customer.primaryContact}
-            </p>
           </div>
 
           <button

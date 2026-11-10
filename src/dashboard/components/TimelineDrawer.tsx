@@ -21,6 +21,7 @@ import {
   PlanTier 
 } from '../types/dashboard';
 import { formatINR } from '../utils/formatters';
+import { CompanyAvatar } from './CompanyAvatar';
 
 interface TimelineDrawerProps {
   invoice: Invoice | null;
@@ -88,18 +89,21 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
         
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-base text-zinc-900 dark:text-white">
-                {invoice.customerCompany}
-              </h3>
-              <span className="text-xs font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                {invoice.invoiceNumber}
-              </span>
+          <div className="flex items-center gap-3">
+            <CompanyAvatar name={invoice.customerCompany} logoUrl={invoice.avatarUrl} size="lg" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-base text-zinc-900 dark:text-white">
+                  {invoice.customerCompany}
+                </h3>
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                  {invoice.invoiceNumber}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Contact: {invoice.customerName} ({invoice.customerEmail})
+              </p>
             </div>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Contact: {invoice.customerName} ({invoice.customerEmail})
-            </p>
           </div>
 
           <button

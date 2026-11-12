@@ -218,8 +218,8 @@ export const pricingPlans: PricingPlan[] = [
     id: 'basic',
     name: 'Basic',
     description: 'For growing small businesses and agencies with steady B2B receivables.',
-    monthlyPriceINR: 4999,
-    annualPriceINR: 3999,
+    monthlyPriceINR: 1,
+    annualPriceINR: 1,
     features: [
       'Up to 50 Invoices in recovery / month',
       'Bulk invoice upload support',
@@ -230,7 +230,7 @@ export const pricingPlans: PricingPlan[] = [
       'Final legal notice template (Day 22)',
       '1-year history & all 8 KPI numbers'
     ],
-    ctaLabel: 'Start 14-Day Free Trial'
+    ctaLabel: 'Test Payment (₹1)'
   },
   {
     id: 'growth',

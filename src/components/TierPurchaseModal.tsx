@@ -56,9 +56,9 @@ export const planEntitlements: EntitlementTier[] = [
   {
     id: 'basic',
     name: 'Basic',
-    badge: 'Growing Teams',
-    monthlyPrice: 2499,
-    annualPrice: 1999,
+    badge: 'Test Plan (₹1)',
+    monthlyPrice: 1,
+    annualPrice: 1,
     period: 'per month',
     invoiceQuota: '50 invoices / mo',
     channels: 'Email, WhatsApp',
@@ -201,7 +201,9 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
     e.preventDefault();
     if (isSelectedCurrent) return;
 
-    const payableAmount = billingAnnual ? targetPlan.annualPrice * 12 : targetPlan.monthlyPrice;
+    const payableAmount = targetPlan.id === 'basic' 
+      ? 1 
+      : (billingAnnual ? targetPlan.annualPrice * 12 : targetPlan.monthlyPrice);
 
     // Free tier downgrade doesn't require payment
     if (isFreePlan) {
@@ -466,9 +468,11 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                     </div>
                     {!isCustomPrice && !isFreePlan && (
                       <div className="text-[10px] text-zinc-400 font-mono">
-                        {billingAnnual 
-                          ? `₹${(targetPlan.annualPrice * 12).toLocaleString('en-IN')}/year total (Saved ₹${((targetPlan.monthlyPrice - targetPlan.annualPrice) * 12).toLocaleString('en-IN')})` 
-                          : 'Billed monthly recurring'}
+                        {targetPlan.id === 'basic'
+                          ? 'Test payment mode: Flat ₹1 total'
+                          : billingAnnual 
+                            ? `₹${(targetPlan.annualPrice * 12).toLocaleString('en-IN')}/year total (Saved ₹${((targetPlan.monthlyPrice - targetPlan.annualPrice) * 12).toLocaleString('en-IN')})` 
+                            : 'Billed monthly recurring'}
                       </div>
                     )}
                   </div>

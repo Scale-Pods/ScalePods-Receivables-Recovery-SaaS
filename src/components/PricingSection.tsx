@@ -136,6 +136,8 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                         ? 'Free forever • No credit card'
                         : plan.isCustomPrice
                         ? 'Tailored volume & custom SLA'
+                        : plan.id === 'basic'
+                        ? 'Test payment plan • ₹1 charge'
                         : isAnnual
                         ? 'Billed annually with 20% discount'
                         : 'Billed monthly, cancel anytime'}

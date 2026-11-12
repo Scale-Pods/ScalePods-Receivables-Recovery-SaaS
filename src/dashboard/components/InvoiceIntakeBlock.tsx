@@ -623,9 +623,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
             <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] p-5 space-y-4 shadow-sm">
               <div>
                 <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Smart Invoice Intake</h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Enter debtor contact details and upload any invoice file to extract details automatically.
-                </p>
               </div>
 
               {uploadError && (
@@ -640,7 +637,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                 {/* Field 1: Customer / Debtor Email */}
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Customer / Debtor Email <span className="text-zinc-400 font-normal font-mono text-[10px]">(optional / nullable)</span>
+                    Customer / Debtor Email
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400">
@@ -662,7 +659,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                 {/* Field 2: Customer / Debtor Phone */}
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Phone / WhatsApp Number <span className="text-zinc-400 font-normal font-mono text-[10px]">(optional / nullable)</span>
+                    Phone / WhatsApp Number
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400">

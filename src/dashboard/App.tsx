@@ -1062,6 +1062,7 @@ export function DashboardView({
             <div>
               <InvoiceIntakeBlock
                 planTier={planTier}
+                currentUser={currentUser}
                 onAddInvoice={handleAddInvoice}
                 onUpgradePrompt={handleUpgradePrompt}
               />

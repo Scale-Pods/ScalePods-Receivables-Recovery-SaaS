@@ -11,6 +11,7 @@ import {
 import confetti from 'canvas-confetti';
 import { UserAccount, PlanTierType } from '../types/auth';
 import { initiateRazorpayPayment } from '../lib/razorpay';
+import { sendPlanPurchaseWebhook } from '../lib/webhook';
 
 interface TierPurchaseModalProps {
   isOpen: boolean;
@@ -190,10 +191,17 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
       ? '₹0' 
       : `₹${activeRate.toLocaleString('en-IN')}`;
 
+  // Select a plan card in matrix
+  const handlePlanCardClick = (tier: EntitlementTier) => {
+    setSelectedTierId(tier.id);
+  };
+
   // Execute payment & plan switch via Razorpay
   const handleConfirmSwitch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSelectedCurrent) return;
+
+    const payableAmount = billingAnnual ? targetPlan.annualPrice * 12 : targetPlan.monthlyPrice;
 
     // Free tier downgrade doesn't require payment
     if (isFreePlan) {
@@ -217,9 +225,21 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
       return;
     }
 
-    setIsProcessing(true);
+    // Trigger webhook ONLY when clicking "Pay via Razorpay"
+    if (currentUser) {
+      sendPlanPurchaseWebhook({
+        name: currentUser.name,
+        email: currentUser.email,
+        companyName: currentUser.companyName,
+        plan: targetPlan.name,
+        planId: targetPlan.id,
+        billingCycle: billingAnnual ? 'annual' : 'monthly',
+        amount: payableAmount,
+        status: 'pay_via_razorpay_clicked',
+      });
+    }
 
-    const payableAmount = billingAnnual ? targetPlan.annualPrice * 12 : targetPlan.monthlyPrice;
+    setIsProcessing(true);
 
     await initiateRazorpayPayment({
       amountInINR: payableAmount,
@@ -233,7 +253,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
         setIsProcessing(false);
         setIsComplete(true);
 
-        // Trigger Confetti celebration
+        // Confetti celebration
         confetti({
           particleCount: 100,
           spread: 80,
@@ -329,7 +349,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                 return (
                   <div
                     key={p.id}
-                    onClick={() => setSelectedTierId(p.id)}
+                    onClick={() => handlePlanCardClick(p)}
                     className={`rounded-2xl border p-4 flex flex-col justify-between transition-all cursor-pointer relative ${
                       isSelected
                         ? 'border-purple-500 bg-purple-600/15 shadow-xl shadow-purple-950/40 ring-1 ring-purple-500/50'
@@ -401,7 +421,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedTierId(p.id);
+                            handlePlanCardClick(p);
                           }}
                           className="w-full py-2 rounded-xl text-xs font-semibold text-center text-zinc-300 bg-zinc-800 hover:bg-purple-600 hover:text-white transition-colors cursor-pointer"
                         >

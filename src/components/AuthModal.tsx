@@ -88,6 +88,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setErrorMsg('Please fill in all required fields.');
         return;
       }
+      if (!companyLogo) {
+        setErrorMsg('Please upload your company logo.');
+        return;
+      }
       if (password.length < 6) {
         setErrorMsg('Password must be at least 6 characters.');
         return;
@@ -256,7 +260,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* Company Logo Upload with Live Preview */}
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Company Logo <span className="text-zinc-500 font-normal">(Optional)</span>
+                  Company Logo <span className="text-purple-400">*</span>
                 </label>
                 
                 <input

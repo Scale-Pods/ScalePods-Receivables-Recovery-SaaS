@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   UploadCloud, 
@@ -52,7 +52,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenCustomerPortal,
   onOpenPlanSettings,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setIsCollapsed(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const navItems = [
     { id: 'overview' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard },
@@ -171,11 +186,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="border-t border-zinc-200 dark:border-zinc-800/80 p-3 space-y-1.5">
         <button
           onClick={onOpenPlanSettings}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
-          title="Settings"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+          title="Usage & Details"
         >
           <SlidersHorizontal className="w-[18px] h-[18px] flex-shrink-0" />
-          {!isCollapsed && <span>Settings</span>}
+          {!isCollapsed && <span>Usage & Details</span>}
         </button>
 
         {!isCollapsed ? (

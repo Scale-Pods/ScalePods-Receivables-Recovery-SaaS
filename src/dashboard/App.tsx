@@ -1214,9 +1214,11 @@ export function DashboardView({
       {isPlanSettingsOpen && (
         <PlanSettingsModal
           currentTier={planTier}
-          onSelectTier={(tier) => {
-            setPlanTier(tier);
-            addToast('success', `Plan upgraded to ${tier.toUpperCase()}`, 'New capabilities enabled.');
+          onSelectTier={(_tier) => {
+            setIsPlanSettingsOpen(false);
+            if (onOpenUpgrade) {
+              onOpenUpgrade();
+            }
           }}
           onClose={() => setIsPlanSettingsOpen(false)}
         />

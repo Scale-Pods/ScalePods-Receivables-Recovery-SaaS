@@ -1,18 +1,99 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, ShieldCheck, Sparkles, CreditCard, ArrowRight, Building2, Zap, Lock, ChevronRight } from 'lucide-react';
+import { 
+  X, 
+  Check, 
+  Sparkles, 
+  ArrowRight, 
+  Lock, 
+  CreditCard, 
+  Loader2
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { PricingPlan, pricingPlans } from '../data/landingData';
-import { UserAccount, PlanTierType, STORAGE_KEY_USER } from '../types/auth';
+import { UserAccount, PlanTierType } from '../types/auth';
+import { initiateRazorpayPayment } from '../lib/razorpay';
 
 interface TierPurchaseModalProps {
   isOpen: boolean;
-  plan?: PricingPlan | null;
+  plan?: { id: string } | null;
   isAnnual?: boolean;
   currentUser: UserAccount | null;
   onClose: () => void;
   onUpgradeSuccess: (newTier: PlanTierType, cycle: 'monthly' | 'annual') => void;
   onRequireAuth: () => void;
 }
+
+interface EntitlementTier {
+  id: PlanTierType;
+  name: string;
+  badge: string;
+  isPopular?: boolean;
+  isCustomPrice?: boolean;
+  monthlyPrice: number;
+  annualPrice: number;
+  period: string;
+  invoiceQuota: string;
+  channels: string;
+  callMinutes: string;
+  sequences: string;
+  aiFeatures: string;
+}
+
+export const planEntitlements: EntitlementTier[] = [
+  {
+    id: 'free',
+    name: 'Free',
+    badge: 'Starter',
+    monthlyPrice: 0,
+    annualPrice: 0,
+    period: 'forever',
+    invoiceQuota: '10 invoices / mo',
+    channels: 'Email only',
+    callMinutes: 'None',
+    sequences: 'Light only (Day 1)',
+    aiFeatures: 'Invoice reading & templates',
+  },
+  {
+    id: 'basic',
+    name: 'Basic',
+    badge: 'Growing Teams',
+    monthlyPrice: 2499,
+    annualPrice: 1999,
+    period: 'per month',
+    invoiceQuota: '50 invoices / mo',
+    channels: 'Email, WhatsApp',
+    callMinutes: 'None',
+    sequences: 'Light & Standard, tone choice',
+    aiFeatures: 'Adds message writing in business tone',
+  },
+  {
+    id: 'growth',
+    name: 'Growth',
+    badge: 'Most Popular',
+    isPopular: true,
+    monthlyPrice: 7999,
+    annualPrice: 6399,
+    period: 'per month',
+    invoiceQuota: '300 invoices / mo',
+    channels: 'Email, WhatsApp, AI Voice Calls',
+    callMinutes: '90 AI voice mins / mo',
+    sequences: 'Light, Standard, Intensive + 21-Day editor',
+    aiFeatures: 'Reply reading, promise capture, multi-lingual',
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    badge: 'Autonomous',
+    isCustomPrice: true,
+    monthlyPrice: 0,
+    annualPrice: 0,
+    period: 'contract',
+    invoiceQuota: 'Unlimited volume',
+    channels: 'All + Dedicated WhatsApp & Custom Voice',
+    callMinutes: 'Custom / Pooled quota',
+    sequences: 'Custom sequences of any length (7-90+ days)',
+    aiFeatures: 'AI-agreed payment plans, self-improving timing',
+  },
+];
 
 export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
   isOpen,
@@ -23,29 +104,32 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
   onUpgradeSuccess,
   onRequireAuth,
 }) => {
-  // Available upgrade tiers (Basic, Growth, Enterprise)
-  const upgradeTiers = pricingPlans.filter(p => p.id !== 'free');
+  // Current active tier
+  const currentTier = (currentUser?.planTier?.toLowerCase() || 'free') as PlanTierType;
 
-  // Active user selection states
-  const [selectedTierId, setSelectedTierId] = useState<string>(plan?.id && plan.id !== 'free' ? plan.id : 'growth');
+  // Selected plan to switch to / pay for
+  const [selectedTierId, setSelectedTierId] = useState<PlanTierType>('growth');
   const [billingAnnual, setBillingAnnual] = useState<boolean>(isAnnual);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'netbanking'>('upi');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
 
-  // Sync initial state when modal opens
+  // Sync state when modal opens
   useEffect(() => {
-    if (plan?.id && plan.id !== 'free') {
-      setSelectedTierId(plan.id);
-    } else if (currentUser?.planTier === 'basic') {
+    if (plan?.id) {
+      setSelectedTierId(plan.id as PlanTierType);
+    } else if (currentTier === 'free') {
       setSelectedTierId('growth');
+    } else if (currentTier === 'basic') {
+      setSelectedTierId('growth');
+    } else if (currentTier === 'growth') {
+      setSelectedTierId('enterprise');
     } else {
       setSelectedTierId('growth');
     }
     setBillingAnnual(isAnnual);
     setIsComplete(false);
     setIsProcessing(false);
-  }, [isOpen, plan, isAnnual, currentUser?.planTier]);
+  }, [isOpen, plan, isAnnual, currentTier]);
 
   if (!isOpen) return null;
 
@@ -94,84 +178,124 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
     );
   }
 
-  // Active selected plan details
-  const activePlan = upgradeTiers.find(p => p.id === selectedTierId) || upgradeTiers[1];
-  const isCustom = activePlan.isCustomPrice;
-  const priceAmount = billingAnnual ? activePlan.annualPriceINR : activePlan.monthlyPriceINR;
-  const formattedPrice = isCustom ? 'Custom Quote' : `₹${priceAmount.toLocaleString('en-IN')}`;
-  const isAlreadyOnThisTier = currentUser.planTier.toLowerCase() === activePlan.id.toLowerCase();
+  // Active target plan
+  const targetPlan = planEntitlements.find(p => p.id === selectedTierId) || planEntitlements[2];
+  const isSelectedCurrent = targetPlan.id === currentTier;
+  const isFreePlan = targetPlan.id === 'free';
+  const isCustomPrice = targetPlan.isCustomPrice;
+  const activeRate = billingAnnual ? targetPlan.annualPrice : targetPlan.monthlyPrice;
+  const formattedPrice = isCustomPrice 
+    ? 'Custom' 
+    : isFreePlan 
+      ? '₹0' 
+      : `₹${activeRate.toLocaleString('en-IN')}`;
 
-  const handlePurchase = (e: React.FormEvent) => {
+  // Execute payment & plan switch via Razorpay
+  const handleConfirmSwitch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isAlreadyOnThisTier) return;
+    if (isSelectedCurrent) return;
+
+    // Free tier downgrade doesn't require payment
+    if (isFreePlan) {
+      setIsProcessing(true);
+      setTimeout(() => {
+        setIsProcessing(false);
+        setIsComplete(true);
+        onUpgradeSuccess('free', 'monthly');
+      }, 500);
+      return;
+    }
+
+    // Enterprise custom plan activation
+    if (isCustomPrice) {
+      setIsProcessing(true);
+      setTimeout(() => {
+        setIsProcessing(false);
+        setIsComplete(true);
+        onUpgradeSuccess('enterprise', 'annual');
+      }, 1000);
+      return;
+    }
 
     setIsProcessing(true);
 
-    setTimeout(() => {
-      setIsProcessing(false);
-      setIsComplete(true);
+    const payableAmount = billingAnnual ? targetPlan.annualPrice * 12 : targetPlan.monthlyPrice;
 
-      // Trigger Confetti
-      confetti({
-        particleCount: 100,
-        spread: 80,
-        origin: { y: 0.6 }
-      });
+    await initiateRazorpayPayment({
+      amountInINR: payableAmount,
+      planName: targetPlan.name,
+      planId: targetPlan.id,
+      billingCycle: billingAnnual ? 'annual' : 'monthly',
+      companyName: currentUser.companyName,
+      userEmail: currentUser.email,
+      userName: currentUser.name,
+      onSuccess: (_response) => {
+        setIsProcessing(false);
+        setIsComplete(true);
 
-      // Update in localStorage
-      const updatedUser: UserAccount = {
-        ...currentUser,
-        planTier: activePlan.id as PlanTierType,
-        billingCycle: billingAnnual ? 'annual' : 'monthly',
-      };
-      try {
-        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
-      } catch (err) {
-        console.warn('Failed to update user tier in localStorage', err);
+        // Trigger Confetti celebration
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+
+        // Synchronize with database and active session
+        onUpgradeSuccess(targetPlan.id, billingAnnual ? 'annual' : 'monthly');
+      },
+      onDismiss: () => {
+        setIsProcessing(false);
+      },
+      onError: (err) => {
+        setIsProcessing(false);
+        console.warn('Payment failed or cancelled:', err);
       }
-
-      onUpgradeSuccess(activePlan.id as PlanTierType, billingAnnual ? 'annual' : 'monthly');
-    }, 850);
+    });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-2xl glass-card rounded-2xl border border-purple-500/30 p-6 sm:p-7 text-white shadow-2xl relative overflow-hidden bg-[#0C0D18] max-h-[92vh] overflow-y-auto"
+        className="w-full max-w-5xl glass-card rounded-2xl border border-purple-500/30 p-5 sm:p-7 text-white shadow-2xl relative overflow-hidden bg-[#0C0D18] max-h-[92vh] overflow-y-auto my-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Accent Line */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-400" />
+        {/* Top Gradient Line */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600" />
 
         {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors cursor-pointer"
+          aria-label="Close upgrade modal"
         >
           <X className="w-5 h-5" />
         </button>
 
         {!isComplete ? (
           <div>
-            {/* Header & Billing Cycle Switcher */}
-            <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Header with Active Tier and Annual Switcher */}
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
               <div>
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-purple-400" />
-                  <span>Choose Your Plan</span>
-                </h2>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Current plan: <strong className="text-white uppercase">{currentUser.planTier}</strong>. Select a tier to upgrade.
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white tracking-tight">
+                    Plan Tiers & Entitlements
+                  </h2>
+                </div>
+                <p className="text-xs text-zinc-400 font-mono">
+                  Active Tier: <span className="text-purple-400 font-bold uppercase">{currentTier}</span> • {currentUser.companyName}
                 </p>
               </div>
 
-              {/* Monthly / Annual Toggle */}
-              <div className="inline-flex items-center p-1 rounded-xl bg-zinc-900 border border-zinc-800 text-xs">
+              {/* Monthly vs Annual Toggle */}
+              <div className="inline-flex items-center p-1 rounded-xl bg-zinc-900 border border-zinc-800 text-xs self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setBillingAnnual(false)}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-                    !billingAnnual ? 'bg-purple-600 text-white font-bold' : 'text-zinc-400 hover:text-white'
+                    !billingAnnual ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-zinc-400 hover:text-white'
                   }`}
                 >
                   Monthly
@@ -179,72 +303,110 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setBillingAnnual(true)}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1 ${
-                    billingAnnual ? 'bg-purple-600 text-white font-bold' : 'text-zinc-400 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                    billingAnnual ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-zinc-400 hover:text-white'
                   }`}
                 >
                   <span>Annual</span>
-                  <span className="text-[10px] text-emerald-300 font-bold">-20%</span>
+                  <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                    -20% OFF
+                  </span>
                 </button>
               </div>
             </div>
 
-            {/* Plan Cards Grid: Choose between Basic, Growth, and Enterprise */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-              {upgradeTiers.map((p) => {
+            {/* 4-COLUMN ENTITLEMENTS COMPARISON MATRIX (Exact Layout as Dashboard Settings) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {planEntitlements.map((p) => {
+                const isActive = currentTier === p.id;
                 const isSelected = selectedTierId === p.id;
-                const isCurrent = currentUser.planTier.toLowerCase() === p.id.toLowerCase();
                 const price = p.isCustomPrice 
                   ? 'Custom' 
-                  : `₹${(billingAnnual ? p.annualPriceINR : p.monthlyPriceINR).toLocaleString('en-IN')}`;
+                  : p.id === 'free' 
+                    ? '₹0' 
+                    : `₹${(billingAnnual ? p.annualPrice : p.monthlyPrice).toLocaleString('en-IN')}`;
 
                 return (
                   <div
                     key={p.id}
                     onClick={() => setSelectedTierId(p.id)}
-                    className={`relative p-4 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                    className={`rounded-2xl border p-4 flex flex-col justify-between transition-all cursor-pointer relative ${
                       isSelected
-                        ? 'border-purple-500 bg-purple-600/15 shadow-[0_0_20px_rgba(124,58,237,0.25)] ring-1 ring-purple-500/50'
-                        : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900'
+                        ? 'border-purple-500 bg-purple-600/15 shadow-xl shadow-purple-950/40 ring-1 ring-purple-500/50'
+                        : isActive
+                          ? 'border-emerald-500/40 bg-emerald-950/10'
+                          : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900/90'
                     }`}
                   >
-                    {/* Badge */}
-                    {p.badge && (
-                      <span className="absolute -top-2.5 right-3 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-purple-500 text-white uppercase shadow-sm">
-                        {p.badge}
-                      </span>
-                    )}
-
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-bold text-white">{p.name}</span>
-                        {/* Radio Checkmark */}
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                          isSelected ? 'border-purple-400 bg-purple-600' : 'border-zinc-700 bg-zinc-800'
+                      {/* Name & Badge */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-sm text-white">{p.name}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                          p.isPopular
+                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 font-bold'
+                            : 'bg-zinc-800 text-zinc-400 border-zinc-700'
                         }`}>
-                          {isSelected && <Check className="w-2.5 h-2.5 text-white stroke-[3]" />}
+                          {p.badge}
+                        </span>
+                      </div>
+
+                      {/* Price Display */}
+                      <div className="mb-3">
+                        <span className="text-2xl font-bold font-mono text-white">{price}</span>
+                        <span className="text-[10px] text-zinc-400 ml-1 font-mono">
+                          /{p.id === 'free' ? 'forever' : billingAnnual ? 'mo (billed annually)' : p.period}
+                        </span>
+                      </div>
+
+                      {/* Entitlements Specs List */}
+                      <div className="space-y-2 text-[11px] text-zinc-300 font-mono border-t border-zinc-800 pt-3">
+                        <div>
+                          <span className="text-zinc-500 block text-[10px]">Volume:</span>
+                          <strong className="text-zinc-200">{p.invoiceQuota}</strong>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500 block text-[10px]">Channels:</span>
+                          <span className="text-zinc-300">{p.channels}</span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500 block text-[10px]">Voice Minutes:</span>
+                          <span className={p.callMinutes !== 'None' ? 'text-purple-400 font-bold' : 'text-zinc-500'}>
+                            {p.callMinutes}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500 block text-[10px]">Sequences:</span>
+                          <span className="text-zinc-300">{p.sequences}</span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500 block text-[10px]">AI Engine:</span>
+                          <span className="text-zinc-400">{p.aiFeatures}</span>
                         </div>
                       </div>
-
-                      <div className="flex items-baseline gap-1 my-2">
-                        <span className="text-lg font-black font-mono text-white">{price}</span>
-                        {!p.isCustomPrice && (
-                          <span className="text-[10px] text-zinc-400 font-mono">/mo</span>
-                        )}
-                      </div>
-
-                      <p className="text-[11px] text-zinc-400 line-clamp-2 leading-tight">
-                        {p.description}
-                      </p>
                     </div>
 
-                    <div className="pt-3 mt-3 border-t border-zinc-800/80 text-[11px] font-mono">
-                      {isCurrent ? (
-                        <span className="text-zinc-500">Current Plan</span>
+                    {/* Card Footer Button */}
+                    <div className="pt-4 mt-4 border-t border-zinc-800">
+                      {isActive ? (
+                        <div className="w-full py-2 rounded-xl text-xs font-mono font-bold text-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+                          Active Current Plan ✓
+                        </div>
+                      ) : isSelected ? (
+                        <div className="w-full py-2 rounded-xl text-xs font-bold text-center text-white bg-purple-600 shadow-md shadow-purple-600/30">
+                          Selected for Upgrade ✓
+                        </div>
                       ) : (
-                        <span className={isSelected ? 'text-purple-300 font-bold' : 'text-zinc-400'}>
-                          {isSelected ? '✓ Selected' : 'Click to select'}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTierId(p.id);
+                          }}
+                          className="w-full py-2 rounded-xl text-xs font-semibold text-center text-zinc-300 bg-zinc-800 hover:bg-purple-600 hover:text-white transition-colors cursor-pointer"
+                        >
+                          Select {p.name}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -252,124 +414,106 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
               })}
             </div>
 
-            {/* Selected Plan Details & Payment Form */}
-            <form onSubmit={handlePurchase} className="space-y-4">
-              
-              {/* Order Summary Box */}
-              <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-between text-xs">
-                <div>
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-purple-400" />
-                    <span>{currentUser.companyName}</span>
-                  </div>
-                  <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
-                    Upgrading to: <strong className="text-purple-300">{activePlan.name}</strong> ({billingAnnual ? 'Annual -20%' : 'Monthly'})
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-base font-black font-mono text-white">
-                    {formattedPrice}
-                  </div>
-                  {!isCustom && (
-                    <div className="text-[10px] text-zinc-500 font-mono">
-                      {billingAnnual ? 'Billed annually' : 'Billed monthly'}
+            {/* PAYMENT & CHECKOUT STEP: ONLY THEN CAN USER SWITCH */}
+            {!isSelectedCurrent && (
+              <form onSubmit={handleConfirmSwitch} className="rounded-2xl border border-purple-500/30 bg-purple-950/15 p-5 sm:p-6 space-y-4">
+                
+                {/* Summary Banner */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                      <CreditCard className="w-5 h-5" />
                     </div>
-                  )}
-                </div>
-              </div>
+                    <div>
+                      <div className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>Payment for {targetPlan.name} Tier</span>
+                        <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">
+                          {billingAnnual ? 'Annual Billing (-20%)' : 'Monthly Billing'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-zinc-400 font-mono mt-0.5">
+                        Subscriber: <strong className="text-zinc-200">{currentUser.companyName}</strong> ({currentUser.email})
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Payment Method Selector (For Paid Plans) */}
-              {!isCustom && !isAlreadyOnThisTier && (
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                    Payment Method
-                  </label>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('upi')}
-                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer font-medium ${
-                        paymentMethod === 'upi'
-                          ? 'bg-purple-600/20 border-purple-500 text-purple-300'
-                          : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      UPI / QR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('card')}
-                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer font-medium ${
-                        paymentMethod === 'card'
-                          ? 'bg-purple-600/20 border-purple-500 text-purple-300'
-                          : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      Credit / Debit Card
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('netbanking')}
-                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer font-medium ${
-                        paymentMethod === 'netbanking'
-                          ? 'bg-purple-600/20 border-purple-500 text-purple-300'
-                          : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      Net Banking
-                    </button>
+                  <div className="text-left sm:text-right">
+                    <div className="text-2xl font-black font-mono text-white">
+                      {formattedPrice}
+                      {!isCustomPrice && !isFreePlan && (
+                        <span className="text-xs font-normal text-zinc-400 ml-1">/mo</span>
+                      )}
+                    </div>
+                    {!isCustomPrice && !isFreePlan && (
+                      <div className="text-[10px] text-zinc-400 font-mono">
+                        {billingAnnual 
+                          ? `₹${(targetPlan.annualPrice * 12).toLocaleString('en-IN')}/year total (Saved ₹${((targetPlan.monthlyPrice - targetPlan.annualPrice) * 12).toLocaleString('en-IN')})` 
+                          : 'Billed monthly recurring'}
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
 
-              {/* Action Button */}
-              {isAlreadyOnThisTier ? (
-                <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-center text-xs text-zinc-400 font-mono">
-                  You are currently active on the <strong>{activePlan.name} Tier</strong>. Select another plan above to switch.
-                </div>
-              ) : (
+                {/* If Free Tier: confirmation note */}
+                {isFreePlan && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                    Switching to the <strong>Free Tier</strong> will restrict monthly recovery to 10 invoices and email-only reminders. No payment is charged.
+                  </div>
+                )}
+
+                {/* SUBMIT BUTTON: ONLY AFTER PAYMENT HANDSHAKE */}
                 <button
                   type="submit"
                   disabled={isProcessing}
-                  className="w-full py-3 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-lg shadow-purple-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+                  className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-lg shadow-purple-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   {isProcessing ? (
-                    <span>Processing Upgrade...</span>
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Opening Razorpay & Verifying Credentials...</span>
+                    </>
                   ) : (
                     <>
                       <span>
-                        {isCustom 
-                          ? 'Request Enterprise Custom Activation' 
-                          : `Confirm & Upgrade to ${activePlan.name} (${formattedPrice})`}
+                        {isFreePlan 
+                          ? 'Confirm Downgrade to Free Tier'
+                          : isCustomPrice
+                            ? 'Request Enterprise Contract Activation'
+                            : `Pay ${formattedPrice} via Razorpay & Switch to ${targetPlan.name}`}
                       </span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
-              )}
+              </form>
+            )}
 
-            </form>
+            {isSelectedCurrent && (
+              <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-center text-xs text-zinc-400 font-mono">
+                You are currently active on the <strong className="text-white">{targetPlan.name} Tier</strong>. Select any other tier in the matrix above to view payment options and upgrade.
+              </div>
+            )}
           </div>
         ) : (
-          /* Confirmation Success View */
-          <div className="py-6 text-center space-y-4 animate-in zoom-in-95 duration-200">
+          /* CONFIRMATION SUCCESS VIEW */
+          <div className="py-8 text-center space-y-4 animate-in zoom-in-95 duration-200">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
               <Check className="w-8 h-8 stroke-[3]" />
             </div>
 
             <h3 className="text-2xl font-black text-white">
-              Plan Upgraded to {activePlan.name}!
+              Payment Confirmed & Plan Upgraded!
             </h3>
 
-            <p className="text-xs text-zinc-300 max-w-sm mx-auto leading-relaxed">
-              <strong>{currentUser.companyName}</strong> is now upgraded to the <strong>{activePlan.name} Tier</strong>. Higher volume limits and features are active.
+            <p className="text-xs text-zinc-300 max-w-md mx-auto leading-relaxed">
+              <strong>{currentUser.companyName}</strong> is now successfully switched to the <strong className="text-purple-300">{targetPlan.name} Tier</strong>. 
+              Your Supabase credentials have been updated, and higher limits are now active.
             </p>
 
-            <div className="pt-2">
+            <div className="pt-3">
               <button
                 onClick={onClose}
-                className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+                className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 shadow-md shadow-purple-600/30 transition-colors cursor-pointer"
               >
                 Close & Return to Dashboard
               </button>

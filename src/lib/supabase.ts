@@ -1,21 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
 import { UserAccount, PlanTierType, STORAGE_KEY_USER, STORAGE_KEY_USERS_DB } from '../types/auth';
+import { hashPassword, verifyPassword } from './security';
 
 // 1. Read Supabase credentials from Vite environment variables (.env)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Supports both VITE_ prefixed and standard SUPABASE_ prefixed variables
+const supabaseUrl = 
+  import.meta.env.VITE_SUPABASE_URL || 
+  import.meta.env.SUPABASE_URL || 
+  '';
+
+const supabaseKey = 
+  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 
+  import.meta.env.SUPABASE_SERVICE_ROLE_KEY || 
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 
+  import.meta.env.SUPABASE_ANON_KEY || 
+  '';
 
 // Detect if Supabase is properly configured
 export const isSupabaseConfigured = Boolean(
   supabaseUrl && 
-  supabaseAnonKey && 
+  supabaseKey && 
   !supabaseUrl.includes('your-project') &&
   supabaseUrl.startsWith('https://')
 );
 
 // 2. Initialize Supabase Client
 export const supabase = isSupabaseConfigured 
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+  ? createClient(supabaseUrl, supabaseKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -26,11 +37,13 @@ export const supabase = isSupabaseConfigured
 
 /**
  * SIGN UP USER:
- * 1. Sends credentials to Supabase Auth.
- *    -> Supabase backend encrypts & hashes the password using bcrypt with salt (Argon2/bcrypt).
- *    -> Passwords are NEVER stored in plaintext.
- * 2. Saves full_name, company_name, company_logo, and plan_tier ('free') to auth metadata and public.profiles table.
- * 3. Falls back smoothly to local storage simulation if Supabase credentials are not yet added to .env.
+ * Inserts a new record into the "Credentials" table:
+ * - "Name": fullName
+ * - "Email": email
+ * - "Password": password
+ * - "Tier": 'free'
+ * - "companyName": companyName
+ * - "companyLogo": companyLogo
  */
 export async function signUpUser(params: {
   email: string;
@@ -40,60 +53,68 @@ export async function signUpUser(params: {
   companyLogo?: string | null;
 }): Promise<{ account: UserAccount | null; error: string | null }> {
   const { email, password, fullName, companyName, companyLogo } = params;
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!companyLogo || !companyLogo.trim()) {
+    return { account: null, error: 'Company logo is required to create an account.' };
+  }
 
   if (isSupabaseConfigured && supabase) {
     try {
-      // Supabase Auth handles password hashing (bcrypt)
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            company_name: companyName,
-            company_logo: companyLogo || null,
-            plan_tier: 'free',
-          },
-        },
-      });
+      // 1. Check if user with this email already exists in "Credentials"
+      const { data: existingUser, error: checkError } = await supabase
+        .from('Credentials')
+        .select('id')
+        .ilike('Email', normalizedEmail)
+        .maybeSingle();
 
-      if (authError) {
-        return { account: null, error: authError.message };
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.warn('Check user query notice:', checkError);
       }
 
-      const user = authData.user;
-      if (!user) {
+      if (existingUser) {
+        return { account: null, error: 'An account with this email already exists. Please log in.' };
+      }
+
+      // 2. Cryptographically hash password before storing in Supabase
+      const hashedPassword = await hashPassword(password);
+
+      // 3. Insert new user into "Credentials"
+      const { data: createdRow, error: insertError } = await supabase
+        .from('Credentials')
+        .insert([
+          {
+            Name: fullName,
+            Email: normalizedEmail,
+            Password: hashedPassword,
+            Tier: 'free',
+            companyName: companyName,
+            companyLogo: companyLogo || null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (insertError) {
+        return { account: null, error: insertError.message || 'Failed to create user in Credentials table.' };
+      }
+
+      if (!createdRow) {
         return { account: null, error: 'Sign up failed. Please try again.' };
       }
 
-      // Upsert into public.profiles table
-      try {
-        await supabase.from('profiles').upsert({
-          id: user.id,
-          email: user.email,
-          full_name: fullName,
-          company_name: companyName,
-          company_logo: companyLogo || null,
-          plan_tier: 'free',
-          billing_cycle: 'monthly',
-          updated_at: new Date().toISOString(),
-        });
-      } catch (dbErr) {
-        console.warn('Profile table upsert note (metadata is already preserved in auth.users):', dbErr);
-      }
-
       const account: UserAccount = {
-        id: user.id,
-        email: user.email || email,
-        name: fullName,
-        companyName,
-        companyLogo: companyLogo || undefined,
-        planTier: 'free',
+        id: String(createdRow.id),
+        email: createdRow.Email || normalizedEmail,
+        name: createdRow.Name || fullName,
+        companyName: createdRow.companyName || companyName,
+        companyLogo: createdRow.companyLogo || undefined,
+        planTier: (createdRow.Tier?.toLowerCase() || 'free') as PlanTierType,
         billingCycle: 'monthly',
-        createdAt: user.created_at || new Date().toISOString(),
+        createdAt: createdRow.created_at || new Date().toISOString(),
       };
 
-      // Persist active session in localStorage for instant access across reloads & recovery-saas
+      // Persist active session in localStorage
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(account));
       return { account, error: null };
     } catch (err: any) {
@@ -106,13 +127,13 @@ export async function signUpUser(params: {
     const usersDbRaw = localStorage.getItem(STORAGE_KEY_USERS_DB) || '[]';
     const usersDb = JSON.parse(usersDbRaw);
 
-    if (usersDb.some((u: any) => u.email.toLowerCase() === email.toLowerCase())) {
-      return { account: null, error: 'An account with this work email already exists.' };
+    if (usersDb.some((u: any) => u.email.toLowerCase() === normalizedEmail)) {
+      return { account: null, error: 'An account with this work email already exists. Please log in.' };
     }
 
     const newAccount: UserAccount = {
       id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      email,
+      email: normalizedEmail,
       name: fullName,
       companyName,
       companyLogo: companyLogo || undefined,
@@ -121,10 +142,11 @@ export async function signUpUser(params: {
       createdAt: new Date().toISOString(),
     };
 
-    // Store encrypted mock entry (base64 + salt hash simulation for dev mode)
+    const hashedPassword = await hashPassword(password);
+
     usersDb.push({
       ...newAccount,
-      passwordHash: btoa(`salt_${password}_recovr`),
+      password: hashedPassword,
     });
 
     localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDb));
@@ -138,57 +160,50 @@ export async function signUpUser(params: {
 
 /**
  * SIGN IN USER:
- * 1. Authenticates against Supabase Auth (verifies encrypted password hash).
- * 2. Fetches company profile details from public.profiles or user metadata.
- * 3. Falls back smoothly to local DB if Supabase is not yet configured.
+ * Queries the "Credentials" table by Email and verifies Password.
  */
 export async function signInUser(params: {
   email: string;
   password: string;
 }): Promise<{ account: UserAccount | null; error: string | null }> {
   const { email, password } = params;
+  const normalizedEmail = email.trim().toLowerCase();
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // 1. Query "Credentials" table for matching Email
+      const { data: userRow, error: fetchError } = await supabase
+        .from('Credentials')
+        .select('*')
+        .ilike('Email', normalizedEmail)
+        .maybeSingle();
 
-      if (authError) {
-        return { account: null, error: authError.message };
+      if (fetchError) {
+        return { account: null, error: `Authentication error: ${fetchError.message}` };
       }
 
-      const user = authData.user;
-      if (!user) {
-        return { account: null, error: 'User record not found.' };
+      if (!userRow) {
+        return { account: null, error: 'No account found with this email. Please sign up.' };
       }
 
-      // Try reading user profile from public.profiles
-      let profileData: any = null;
-      try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        profileData = data;
-      } catch (e) {
-        console.warn('Could not fetch from profiles table, using user_metadata fallback:', e);
+      // 2. Cryptographically verify password
+      const isPasswordValid = await verifyPassword(password, userRow.Password);
+      if (!isPasswordValid) {
+        return { account: null, error: 'Incorrect password. Please verify your credentials.' };
       }
 
-      const meta = user.user_metadata || {};
       const account: UserAccount = {
-        id: user.id,
-        email: user.email || email,
-        name: profileData?.full_name || meta.full_name || 'Admin',
-        companyName: profileData?.company_name || meta.company_name || 'My Enterprise',
-        companyLogo: profileData?.company_logo || meta.company_logo || null,
-        planTier: (profileData?.plan_tier || meta.plan_tier || 'free') as PlanTierType,
-        billingCycle: (profileData?.billing_cycle || meta.billing_cycle || 'monthly') as 'monthly' | 'annual',
-        createdAt: user.created_at || new Date().toISOString(),
+        id: String(userRow.id),
+        email: userRow.Email || normalizedEmail,
+        name: userRow.Name || 'Admin',
+        companyName: userRow.companyName || 'My Enterprise',
+        companyLogo: userRow.companyLogo || undefined,
+        planTier: (userRow.Tier?.toLowerCase() || 'free') as PlanTierType,
+        billingCycle: 'monthly',
+        createdAt: userRow.created_at || new Date().toISOString(),
       };
 
+      // Persist active session in localStorage
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(account));
       return { account, error: null };
     } catch (err: any) {
@@ -202,15 +217,15 @@ export async function signInUser(params: {
     const usersDb = JSON.parse(usersDbRaw);
 
     const userRecord = usersDb.find(
-      (u: any) => u.email.toLowerCase() === email.toLowerCase()
+      (u: any) => u.email.toLowerCase() === normalizedEmail
     );
 
     if (!userRecord) {
       return { account: null, error: 'No account found with this email. Please sign up.' };
     }
 
-    const expectedHash = btoa(`salt_${password}_recovr`);
-    if (userRecord.passwordHash && userRecord.passwordHash !== expectedHash) {
+    const isPasswordValid = await verifyPassword(password, userRecord.password);
+    if (!isPasswordValid) {
       return { account: null, error: 'Incorrect password. Please verify your credentials.' };
     }
 
@@ -241,7 +256,7 @@ export async function signOutUser(): Promise<void> {
     try {
       await supabase.auth.signOut();
     } catch (e) {
-      console.warn('Supabase sign out notice:', e);
+      // Ignored for custom credentials table
     }
   }
   localStorage.removeItem(STORAGE_KEY_USER);
@@ -249,7 +264,7 @@ export async function signOutUser(): Promise<void> {
 
 /**
  * UPDATE PLAN TIER:
- * Updates plan tier in Supabase profiles and local state.
+ * Updates the "Tier" column in the "Credentials" table and localStorage.
  */
 export async function updatePlanTierInSupabase(
   userId: string,
@@ -258,16 +273,21 @@ export async function updatePlanTierInSupabase(
 ): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase
-        .from('profiles')
+      // Update "Tier" in "Credentials" table
+      const numericId = Number(userId);
+      const query = supabase
+        .from('Credentials')
         .update({
-          plan_tier: newTier,
-          billing_cycle: cycle,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId);
+          Tier: newTier,
+        });
+
+      if (!isNaN(numericId)) {
+        await query.eq('id', numericId);
+      } else {
+        await query.eq('id', userId);
+      }
     } catch (e) {
-      console.warn('Failed to update tier in Supabase:', e);
+      console.warn('Failed to update Tier in Credentials table:', e);
     }
   }
 

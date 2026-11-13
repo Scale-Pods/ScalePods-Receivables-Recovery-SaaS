@@ -40,6 +40,34 @@ export function App() {
     }
   }, []);
 
+  // Synchronize route with URL (supports /upgrade, /dashboard, and /)
+  useEffect(() => {
+    const syncRouteFromUrl = () => {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+
+      if (path === '/upgrade' || hash === '#upgrade') {
+        setIsPurchaseModalOpen(true);
+        // If user session exists, show behind dashboard, else behind landing
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY_USER);
+          if (stored) {
+            setActiveView('dashboard');
+          }
+        } catch {}
+      } else if (path === '/dashboard') {
+        setActiveView('dashboard');
+        setIsPurchaseModalOpen(false);
+      } else {
+        setIsPurchaseModalOpen(false);
+      }
+    };
+
+    syncRouteFromUrl();
+    window.addEventListener('popstate', syncRouteFromUrl);
+    return () => window.removeEventListener('popstate', syncRouteFromUrl);
+  }, []);
+
   // Auth Handlers
   const handleOpenAuth = (mode: 'signup' | 'signin' = 'signup') => {
     setAuthModalMode(mode);
@@ -50,25 +78,60 @@ export function App() {
     await signOutUser();
     setCurrentUser(null);
     setActiveView('landing');
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
   };
 
   // On Login/Signup Success: save user and automatically switch directly to the Dashboard!
   const handleAuthSuccess = (account: UserAccount) => {
     setCurrentUser(account);
     setActiveView('dashboard');
+    if (window.location.pathname !== '/dashboard' && window.location.pathname !== '/upgrade') {
+      window.history.pushState({ view: 'dashboard' }, '', '/dashboard');
+    }
   };
 
-  // Plan Selection & Purchase Handlers
+  // Plan Selection & Purchase Handlers with dedicated /upgrade URL
   const handleSelectPlan = (plan: PricingPlan, isAnnual: boolean) => {
     setSelectedPlanForPurchase(plan);
     setPurchaseIsAnnual(isAnnual);
     setIsPurchaseModalOpen(true);
+    if (window.location.pathname !== '/upgrade') {
+      window.history.pushState({ view: 'upgrade', plan: plan.id }, '', '/upgrade');
+    }
   };
 
   const handleOpenUpgradeFromNavbar = () => {
     setSelectedPlanForPurchase(null);
     setPurchaseIsAnnual(true);
     setIsPurchaseModalOpen(true);
+    if (window.location.pathname !== '/upgrade') {
+      window.history.pushState({ view: 'upgrade' }, '', '/upgrade');
+    }
+  };
+
+  const handleClosePurchaseModal = () => {
+    setIsPurchaseModalOpen(false);
+    setSelectedPlanForPurchase(null);
+    if (window.location.pathname === '/upgrade') {
+      const fallbackUrl = activeView === 'dashboard' ? '/dashboard' : '/';
+      window.history.pushState({}, '', fallbackUrl);
+    }
+  };
+
+  const handleSwitchToDashboard = () => {
+    setActiveView('dashboard');
+    if (window.location.pathname !== '/dashboard') {
+      window.history.pushState({ view: 'dashboard' }, '', '/dashboard');
+    }
+  };
+
+  const handleSwitchToLanding = () => {
+    setActiveView('landing');
+    if (window.location.pathname !== '/') {
+      window.history.pushState({ view: 'landing' }, '', '/');
+    }
   };
 
   const handleUpgradeSuccess = async (newTier: PlanTierType, cycle: 'monthly' | 'annual') => {
@@ -98,7 +161,7 @@ export function App() {
         <DashboardView
           currentUser={currentUser}
           onSignOut={handleSignOut}
-          onSwitchToLanding={() => setActiveView('landing')}
+          onSwitchToLanding={handleSwitchToLanding}
           onOpenUpgrade={handleOpenUpgradeFromNavbar}
         />
 
@@ -108,7 +171,7 @@ export function App() {
           plan={selectedPlanForPurchase}
           isAnnual={purchaseIsAnnual}
           currentUser={currentUser}
-          onClose={() => setIsPurchaseModalOpen(false)}
+          onClose={handleClosePurchaseModal}
           onUpgradeSuccess={handleUpgradeSuccess}
           onRequireAuth={() => handleOpenAuth('signup')}
         />
@@ -126,7 +189,7 @@ export function App() {
         onOpenAuth={handleOpenAuth}
         onSignOut={handleSignOut}
         onOpenUpgrade={handleOpenUpgradeFromNavbar}
-        onSwitchToDashboard={() => setActiveView('dashboard')}
+        onSwitchToDashboard={handleSwitchToDashboard}
       />
 
       {/* Main Marketing Page Flow */}
@@ -168,7 +231,7 @@ export function App() {
         plan={selectedPlanForPurchase}
         isAnnual={purchaseIsAnnual}
         currentUser={currentUser}
-        onClose={() => setIsPurchaseModalOpen(false)}
+        onClose={handleClosePurchaseModal}
         onUpgradeSuccess={handleUpgradeSuccess}
         onRequireAuth={() => handleOpenAuth('signup')}
       />

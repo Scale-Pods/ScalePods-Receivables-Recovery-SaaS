@@ -841,8 +841,12 @@ export function DashboardView({
   };
 
   const handleUpgradePrompt = (tier: PlanTier = 'growth') => {
-    setPlanTier(tier);
-    addToast('success', `Plan switched to ${tier.toUpperCase()}`, 'Features for this tier are now unlocked.');
+    if (onOpenUpgrade) {
+      onOpenUpgrade();
+    } else {
+      setPlanTier(tier);
+      addToast('success', `Plan switched to ${tier.toUpperCase()}`, 'Features for this tier are now unlocked.');
+    }
   };
 
   // Smart Intake: Add newly parsed or manual invoice

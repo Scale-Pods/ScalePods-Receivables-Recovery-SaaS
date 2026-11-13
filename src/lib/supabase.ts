@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { UserAccount, PlanTierType, UserRole, STORAGE_KEY_USER, STORAGE_KEY_USERS_DB } from '../types/auth';
 import { hashPassword, verifyPassword } from './security';
-import { isDeveloperEmail } from './roles';
 
 // 1. Read Supabase credentials from Vite environment variables (.env)
 // Supports both VITE_ prefixed and standard SUPABASE_ prefixed variables
@@ -82,20 +81,40 @@ export async function signUpUser(params: {
       const hashedPassword = await hashPassword(password);
 
       // 3. Insert new user into "Credentials"
-      const { data: createdRow, error: insertError } = await supabase
+      const insertPayload: Record<string, any> = {
+        Name: fullName,
+        Email: normalizedEmail,
+        Password: hashedPassword,
+        Tier: 'free',
+        companyName: companyName,
+        companyLogo: companyLogo || null,
+        Role: 'client',
+      };
+
+      let createdRow: any = null;
+      let insertError: any = null;
+
+      const firstAttempt = await supabase
         .from('Credentials')
-        .insert([
-          {
-            Name: fullName,
-            Email: normalizedEmail,
-            Password: hashedPassword,
-            Tier: 'free',
-            companyName: companyName,
-            companyLogo: companyLogo || null,
-          },
-        ])
+        .insert([insertPayload])
         .select()
         .single();
+
+      createdRow = firstAttempt.data;
+      insertError = firstAttempt.error;
+
+      // Graceful fallback if the "Role" or "role" column has not been added to Credentials table yet
+      if (insertError && (insertError.message?.toLowerCase().includes('column "role"') || insertError.code === '42703')) {
+        delete insertPayload.Role;
+        delete insertPayload.role;
+        const retryAttempt = await supabase
+          .from('Credentials')
+          .insert([insertPayload])
+          .select()
+          .single();
+        createdRow = retryAttempt.data;
+        insertError = retryAttempt.error;
+      }
 
       if (insertError) {
         return { account: null, error: insertError.message || 'Failed to create user in Credentials table.' };
@@ -105,7 +124,11 @@ export async function signUpUser(params: {
         return { account: null, error: 'Sign up failed. Please try again.' };
       }
 
-      const assignedRole: UserRole = isDeveloperEmail(normalizedEmail) ? 'developer' : 'client';
+      // Read role from DB (checks both Role and role, defaults to 'client')
+      const rawRole = (createdRow.Role ?? createdRow.role)
+        ? String(createdRow.Role ?? createdRow.role).trim().toLowerCase()
+        : null;
+      const assignedRole: UserRole = rawRole === 'developer' ? 'developer' : 'client';
 
       const account: UserAccount = {
         id: String(createdRow.id),
@@ -136,7 +159,7 @@ export async function signUpUser(params: {
       return { account: null, error: 'An account with this work email already exists. Please log in.' };
     }
 
-    const assignedRole: UserRole = isDeveloperEmail(normalizedEmail) ? 'developer' : 'client';
+    const assignedRole: UserRole = 'client';
 
     const newAccount: UserAccount = {
       id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -200,7 +223,11 @@ export async function signInUser(params: {
         return { account: null, error: 'Incorrect password. Please verify your credentials.' };
       }
 
-      const assignedRole: UserRole = isDeveloperEmail(normalizedEmail) ? 'developer' : 'client';
+      // Read role from DB column "Role" or "role" in Supabase Credentials table
+      const rawRole = (userRow.Role ?? userRow.role)
+        ? String(userRow.Role ?? userRow.role).trim().toLowerCase()
+        : null;
+      const assignedRole: UserRole = rawRole === 'developer' ? 'developer' : 'client';
 
       const account: UserAccount = {
         id: String(userRow.id),
@@ -240,7 +267,8 @@ export async function signInUser(params: {
       return { account: null, error: 'Incorrect password. Please verify your credentials.' };
     }
 
-    const assignedRole: UserRole = isDeveloperEmail(normalizedEmail) ? 'developer' : 'client';
+    const rawRole = userRecord.role ? String(userRecord.role).trim().toLowerCase() : null;
+    const assignedRole: UserRole = rawRole === 'developer' ? 'developer' : 'client';
 
     const account: UserAccount = {
       id: userRecord.id,

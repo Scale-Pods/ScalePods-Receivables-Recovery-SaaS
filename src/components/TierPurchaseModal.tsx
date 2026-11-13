@@ -237,6 +237,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
     let generatedOrderId: string | null = null;
     let orderAmountInPaise: number | null = null;
     let orderCurrency: string = 'INR';
+    let orderKeyId: string | null = null;
 
     if (currentUser) {
       try {
@@ -254,18 +255,20 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
           generatedOrderId = orderResult.orderId;
           if (orderResult.amountInPaise) orderAmountInPaise = orderResult.amountInPaise;
           if (orderResult.currency) orderCurrency = orderResult.currency;
+          if (orderResult.keyId) orderKeyId = orderResult.keyId;
         }
       } catch (e) {
         console.warn('Order webhook call notice:', e);
       }
     }
 
-    // 2. Open Razorpay Checkout modal with the generated order_id
+    // 2. Open Razorpay Checkout modal with the generated order_id & key_id
     await initiateRazorpayPayment({
       amountInINR: payableAmount,
       amountInPaise: orderAmountInPaise,
       currency: orderCurrency,
       orderId: generatedOrderId,
+      keyId: orderKeyId,
       planName: targetPlan.name,
       planId: targetPlan.id,
       billingCycle: billingAnnual ? 'annual' : 'monthly',

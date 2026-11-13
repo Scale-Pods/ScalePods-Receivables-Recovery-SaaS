@@ -102,7 +102,7 @@ export interface Invoice {
   riskTier: CustomerRiskTier;
   cadence: CadenceIntensity;
   isLockedByOwner?: boolean;
-  currentStage: 'Friendly' | 'Firm' | 'Escalation' | 'Executive/Legal Hold' | 'Done';
+  currentStage: 'Friendly' | 'Firm' | 'Escalation' | 'Executive Hold' | 'Executive/Legal Hold' | 'Done';
   lastTouch: {
     channel: ChannelType;
     action: string;

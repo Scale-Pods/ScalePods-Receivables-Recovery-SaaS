@@ -126,7 +126,7 @@ export const ChangeBucketModal: React.FC<ChangeBucketModalProps> = ({
     { id: 'early', label: 'Early', range: '0–14 days overdue', tone: 'Friendly & Consultative tone' },
     { id: '15+', label: '15+', range: '15–29 days overdue', tone: 'Clear & Firm payment schedule' },
     { id: '30+', label: '30+', range: '30–59 days overdue', tone: 'Urgent CFO Escalation & Voice AI' },
-    { id: '60+', label: '60+', range: '60 or more days overdue', tone: 'Executive Hold / Legal demand' },
+    { id: '60+', label: '60+', range: '60 or more days overdue', tone: 'Executive Review / Human Escalation' },
   ];
 
   return (

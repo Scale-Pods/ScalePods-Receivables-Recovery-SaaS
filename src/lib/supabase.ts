@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { UserAccount, PlanTierType, STORAGE_KEY_USER, STORAGE_KEY_USERS_DB } from '../types/auth';
+import { UserAccount, PlanTierType, UserRole, STORAGE_KEY_USER, STORAGE_KEY_USERS_DB } from '../types/auth';
 import { hashPassword, verifyPassword } from './security';
+import { isDeveloperEmail } from './roles';
 
 // 1. Read Supabase credentials from Vite environment variables (.env)
 // Supports both VITE_ prefixed and standard SUPABASE_ prefixed variables
@@ -51,8 +52,9 @@ export async function signUpUser(params: {
   fullName: string;
   companyName: string;
   companyLogo?: string | null;
+  role?: UserRole;
 }): Promise<{ account: UserAccount | null; error: string | null }> {
-  const { email, password, fullName, companyName, companyLogo } = params;
+  const { email, password, fullName, companyName, companyLogo, role = 'client' } = params;
   const normalizedEmail = email.trim().toLowerCase();
 
   if (!companyLogo || !companyLogo.trim()) {
@@ -103,6 +105,8 @@ export async function signUpUser(params: {
         return { account: null, error: 'Sign up failed. Please try again.' };
       }
 
+      const assignedRole: UserRole = isDeveloperEmail(normalizedEmail) ? 'developer' : 'client';
+
       const account: UserAccount = {
         id: String(createdRow.id),
         email: createdRow.Email || normalizedEmail,
@@ -111,6 +115,7 @@ export async function signUpUser(params: {
         companyLogo: createdRow.companyLogo || undefined,
         planTier: (createdRow.Tier?.toLowerCase() || 'free') as PlanTierType,
         billingCycle: 'monthly',
+        role: assignedRole,
         createdAt: createdRow.created_at || new Date().toISOString(),
       };
 
@@ -131,6 +136,8 @@ export async function signUpUser(params: {
       return { account: null, error: 'An account with this work email already exists. Please log in.' };
     }
 
+    const assignedRole: UserRole = isDeveloperEmail(normalizedEmail) ? 'developer' : 'client';
+
     const newAccount: UserAccount = {
       id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       email: normalizedEmail,
@@ -139,6 +146,7 @@ export async function signUpUser(params: {
       companyLogo: companyLogo || undefined,
       planTier: 'free',
       billingCycle: 'monthly',
+      role: assignedRole,
       createdAt: new Date().toISOString(),
     };
 
@@ -192,6 +200,8 @@ export async function signInUser(params: {
         return { account: null, error: 'Incorrect password. Please verify your credentials.' };
       }
 
+      const assignedRole: UserRole = isDeveloperEmail(normalizedEmail) ? 'developer' : 'client';
+
       const account: UserAccount = {
         id: String(userRow.id),
         email: userRow.Email || normalizedEmail,
@@ -200,6 +210,7 @@ export async function signInUser(params: {
         companyLogo: userRow.companyLogo || undefined,
         planTier: (userRow.Tier?.toLowerCase() || 'free') as PlanTierType,
         billingCycle: 'monthly',
+        role: assignedRole,
         createdAt: userRow.created_at || new Date().toISOString(),
       };
 
@@ -229,6 +240,8 @@ export async function signInUser(params: {
       return { account: null, error: 'Incorrect password. Please verify your credentials.' };
     }
 
+    const assignedRole: UserRole = isDeveloperEmail(normalizedEmail) ? 'developer' : 'client';
+
     const account: UserAccount = {
       id: userRecord.id,
       email: userRecord.email,
@@ -237,6 +250,7 @@ export async function signInUser(params: {
       companyLogo: userRecord.companyLogo || undefined,
       planTier: userRecord.planTier || 'free',
       billingCycle: userRecord.billingCycle || 'monthly',
+      role: assignedRole,
       createdAt: userRecord.createdAt,
     };
 

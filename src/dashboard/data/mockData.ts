@@ -200,10 +200,10 @@ export const mockAgeingBuckets: AgeingBucketStats[] = [
     amount: 1000000,
     customerCount: 13,
     percentage: 23.4,
-    tone: 'MSME Samadhaan / Legal',
-    channelFocus: 'Pre-Legal & Settlement Demand',
+    tone: 'Executive Review / Escalation',
+    channelFocus: 'Executive Outreach & Settlement',
     urgencyColor: 'rose',
-    cadenceDescription: 'Prompt-pay discount offer (e.g. 4.5% instant waiver) or formal statutory claim under Section 16 MSMED Act 2006.',
+    cadenceDescription: 'Prompt-pay discount offer (e.g. 4.5% instant waiver) or structured payment settlement.',
   },
 ];
 
@@ -247,6 +247,31 @@ export const mockChannelPerformances: ChannelPerformance[] = [
 ];
 
 export const mockFocusItems: FocusItem[] = [
+  {
+    id: 'foc-day22-1',
+    type: 'approval',
+    title: 'Day 22 Final Recovery Review: INV-2024-7108',
+    customerName: 'Nexora Infotech Pvt Ltd',
+    company: 'Nexora Infotech',
+    invoiceId: 'INV-2024-7108',
+    amount: 284000,
+    badgeText: 'Overdue 22 Days Over',
+    badgeVariant: 'rose',
+    description: 'Invoice has reached Day 22 (the final day of autonomous recovery sequence). Automated outreach is paused awaiting human approval.',
+    actionPrimary: {
+      label: 'Human Approval',
+      actionKey: 'human_approval',
+    },
+    actionSecondary: {
+      label: 'Extend 7 Days',
+      actionKey: 'extend_day22_grace',
+    },
+    details: {
+      daysOverdue: 22,
+      cfoName: 'Rajesh Sharma, VP Finance',
+      status: 'Sequence completed. Awaiting human approval.',
+    }
+  },
   {
     id: 'foc-1',
     type: 'approval',
@@ -917,18 +942,18 @@ export const mockInvoices: Invoice[] = [
     dueDate: '2026-07-28',
     daysOverdue: 99,
     bucket: '60+',
-    bucketTone: 'MSME Samadhaan / Legal (60d+)',
+    bucketTone: 'Executive Hold / Review (60d+)',
     status: 'paused',
     riskScore: 28,
     riskTier: 'high_risk',
     cadence: 'intensive',
-    currentStage: 'Executive/Legal Hold',
+    currentStage: 'Executive Hold',
     lastTouch: {
       channel: 'voice',
-      action: 'Formal pre-action notice served under MSMED Act Section 16',
+      action: 'Final notice delivered to CFO',
       timestamp: '3 days ago',
     },
-    nextScheduledStep: 'Legal counsel review or file claim on MSME Samadhaan portal',
+    nextScheduledStep: 'Executive phone conference with CFO',
     hasProofFile: false,
     hasTicket: false,
     hasDispute: false,
@@ -959,7 +984,7 @@ export const mockInvoices: Invoice[] = [
         timestamp: 'Sep 26, 2026',
         type: 'bucket_move',
         title: 'Moved up to 60+ Bucket (Executive Hold)',
-        description: 'Overdue exceeded 60 days. Escalated to MSME Samadhaan statutory claim preparation.',
+        description: 'Overdue exceeded 60 days. Escalated to executive review.',
       },
     ]
   },
@@ -1014,7 +1039,7 @@ export const mockInvoices: Invoice[] = [
     dueDate: '2026-08-15',
     daysOverdue: 81,
     bucket: '60+',
-    bucketTone: 'MSME Samadhaan / Legal (60d+)',
+    bucketTone: 'Executive Hold / Review (60d+)',
     status: 'promise',
     riskScore: 50,
     riskTier: 'watch',

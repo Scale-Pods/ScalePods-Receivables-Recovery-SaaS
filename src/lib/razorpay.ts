@@ -42,6 +42,7 @@ export interface InitiateRazorpayParams {
   amountInPaise?: number | null;
   currency?: string;
   orderId?: string | null;
+  keyId?: string | null;
   planName: string;
   planId: string;
   billingCycle: 'monthly' | 'annual';
@@ -69,6 +70,7 @@ export function isRazorpayConfigured(): boolean {
  */
 export async function initiateRazorpayPayment(params: InitiateRazorpayParams): Promise<void> {
   const razorpayKey = 
+    params.keyId ||
     import.meta.env.VITE_RAZORPAY_KEY_ID || 
     import.meta.env.RAZORPAY_KEY_ID || 
     '';

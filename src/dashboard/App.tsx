@@ -42,17 +42,17 @@ import { LedgerTableBlock } from './components/LedgerTableBlock';
 import { ForecastAndTeamBlock } from './components/ForecastAndTeamBlock';
 import { SequenceEngineBlock } from './components/SequenceEngineBlock';
 import { InvoiceIntakeBlock } from './components/InvoiceIntakeBlock';
-import { OmnichannelSimulatorBlock } from './components/OmnichannelSimulatorBlock';
-import { Day22ApprovalsBlock } from './components/Day22ApprovalsBlock';
 import { CustomerPortalModal } from './components/CustomerPortalModal';
 import { PlanSettingsModal } from './components/PlanSettingsModal';
 import { TimelineDrawer } from './components/TimelineDrawer';
 import { ProofModal } from './components/ProofModal';
 import { PauseModal, ChangeBucketModal, AnswerTicketModal } from './components/ActionModals';
+import { User, Code2, Sun, Moon, LogOut } from 'lucide-react';
 import { CustomerRiskModal } from './components/CustomerRiskModal';
 import { NotificationToast, ToastMessage } from './components/NotificationToast';
 import { formatINR } from './utils/formatters';
-import { UserAccount } from '../types/auth';
+import { UserAccount, UserRole, STORAGE_KEY_ROLE } from '../types/auth';
+import { isDeveloperUser } from '../lib/roles';
 
 export interface DashboardViewProps {
   currentUser?: UserAccount | null;
@@ -72,6 +72,62 @@ export function DashboardView({
 
   // Active Tab: 'overview' | 'ledger' | 'intake' | 'sequence' | 'simulator' | 'day22' | 'channels' | 'forecast'
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+
+  // Strict Developer permission check (zero-DB changes: Email Whitelist / Admin domain)
+  const isDevAllowed = isDeveloperUser(currentUser);
+
+  // Role-based view state ('client' | 'developer')
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    if (!isDevAllowed) return 'client';
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_ROLE) as UserRole;
+      if (stored === 'client' || stored === 'developer') return stored;
+      return 'developer';
+    } catch {
+      return 'developer';
+    }
+  });
+
+  // Guard: if non-developer somehow has 'developer' role or sequence tab active, reset to 'client' & 'overview'
+  useEffect(() => {
+    if (!isDevAllowed) {
+      if (userRole !== 'client') {
+        setUserRole('client');
+      }
+      if (activeTab === 'sequence') {
+        setActiveTab('overview');
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY_ROLE, 'client');
+      } catch (err) {
+        console.warn('Failed to reset role in localStorage', err);
+      }
+    }
+  }, [isDevAllowed, userRole, activeTab]);
+
+  const handleRoleChange = (newRole: UserRole) => {
+    if (!isDevAllowed) return; // Prevent unauthorized role escalation
+    setUserRole(newRole);
+    try {
+      localStorage.setItem(STORAGE_KEY_ROLE, newRole);
+    } catch (err) {
+      console.warn('Failed to save role to localStorage', err);
+    }
+    if (newRole === 'developer') {
+      setActiveTab('sequence');
+    } else {
+      setActiveTab('overview');
+    }
+  };
+
+  // Keep activeTab aligned with role boundaries (21-Day Engine on dev side, core recovery on client side)
+  useEffect(() => {
+    if (userRole === 'developer' && activeTab !== 'sequence') {
+      setActiveTab('sequence');
+    } else if (userRole === 'client' && activeTab === 'sequence') {
+      setActiveTab('overview');
+    }
+  }, [userRole]);
 
   // Plan Tier simulator (Free, Basic, Growth, Enterprise) — syncs with user account
   const [planTier, setPlanTier] = useState<PlanTier>(
@@ -136,7 +192,37 @@ export function DashboardView({
         if (isMounted) {
           setInvoices(res.invoices);
           setCustomers(res.customers);
-          setFocusItems(res.focusItems);
+          
+          // Ensure any active invoice at or past Day 22 (>= 22 days) appears in Approvals tab
+          const baseFocus = res.focusItems || [];
+          const existingIds = new Set(baseFocus.map((f: FocusItem) => f.invoiceId));
+          const overdue22Items: FocusItem[] = (res.invoices || [])
+            .filter((inv: Invoice) => inv.status === 'active' && inv.daysOverdue >= 22 && !existingIds.has(inv.invoiceNumber))
+            .map((inv: Invoice) => ({
+              id: `foc-d22-${inv.id}`,
+              type: 'approval' as const,
+              title: `Day 22 Final Recovery Review: ${inv.invoiceNumber}`,
+              customerName: inv.customerName,
+              company: inv.customerCompany,
+              invoiceId: inv.invoiceNumber,
+              amount: inv.amount,
+              badgeText: 'Overdue 22 Days Over',
+              badgeVariant: 'rose' as const,
+              description: `Invoice has passed 22 days overdue (final day of sequence). Autonomous cadence paused. Requires human approval for next action.`,
+              actionPrimary: {
+                label: 'Human Approval',
+                actionKey: 'human_approval',
+              },
+              actionSecondary: {
+                label: 'Extend 7 Days',
+                actionKey: 'extend_day22_grace',
+              },
+              details: {
+                daysOverdue: inv.daysOverdue,
+              },
+            }));
+
+          setFocusItems([...overdue22Items, ...baseFocus]);
           setPayments(res.payments);
           setIsCloudDb(res.isCloud);
         }
@@ -440,7 +526,7 @@ export function DashboardView({
       'early': 'Friendly & Consultative (0–14d)',
       '15+': 'Clear & Firm (15–29d)',
       '30+': 'Urgent Escalation (30–59d)',
-      '60+': 'Executive Hold / Legal (60d+)',
+      '60+': 'Executive Hold / Human Review (60d+)',
     };
 
     let updatedInv: Invoice = { ...invoice };
@@ -697,6 +783,57 @@ export function DashboardView({
         setFocusItems((prev) => prev.filter((f) => f.id !== item.id));
         addToast('warning', 'Voice Call Queued', 'Voice AI is calling Rajesh Sharma (Managing Director).');
       }
+    } else if (actionKey === 'human_approval' || actionKey === 'serve_day22_notice') {
+      if (targetInvoice) {
+        setInvoices((prev) =>
+          prev.map((inv) =>
+            inv.id === targetInvoice.id
+              ? {
+                  ...inv,
+                  status: 'paused',
+                  timeline: [
+                    {
+                      id: `t-${Date.now()}`,
+                      timestamp: 'Just now',
+                      channel: 'email',
+                      type: 'owner_action',
+                      title: 'Human Approval Granted',
+                      description: 'Owner approved final escalation step for Day 22 overdue receivable.',
+                    },
+                    ...inv.timeline,
+                  ],
+                }
+              : inv
+          )
+        );
+      }
+      setFocusItems((prev) => prev.filter((f) => f.id !== item.id));
+      triggerConfetti();
+      addToast('success', 'Human Approval Recorded', `Approved next step for invoice ${item.invoiceId}.`);
+    } else if (actionKey === 'extend_day22_grace') {
+      if (targetInvoice) {
+        setInvoices((prev) =>
+          prev.map((inv) =>
+            inv.id === targetInvoice.id
+              ? {
+                  ...inv,
+                  timeline: [
+                    {
+                      id: `t-${Date.now()}`,
+                      timestamp: 'Just now',
+                      type: 'owner_action',
+                      title: '7-Day Grace Extension Granted',
+                      description: 'Owner approved a 7-day grace extension.',
+                    },
+                    ...inv.timeline,
+                  ],
+                }
+              : inv
+          )
+        );
+      }
+      setFocusItems((prev) => prev.filter((f) => f.id !== item.id));
+      addToast('info', 'Grace Extension Granted', `7-day extension recorded for ${item.invoiceId}.`);
     } else {
       setFocusItems((prev) => prev.filter((f) => f.id !== item.id));
       addToast('info', 'Action Completed', `${item.title} has been processed.`);
@@ -751,6 +888,34 @@ export function DashboardView({
     };
 
     setInvoices((prev) => [fullInvoice, ...prev]);
+
+    // If invoice reached Day 22 (>= 22 days overdue), queue it in Approvals with 'Overdue 22 Days Over' tag
+    if (fullInvoice.daysOverdue >= 22) {
+      const day22FocusItem: FocusItem = {
+        id: `foc-d22-${fullInvoice.id}`,
+        type: 'approval',
+        title: `Day 22 Final Recovery Review: ${fullInvoice.invoiceNumber}`,
+        customerName: fullInvoice.customerName,
+        company: fullInvoice.customerCompany,
+        invoiceId: fullInvoice.invoiceNumber,
+        amount: fullInvoice.amount,
+        badgeText: 'Overdue 22 Days Over',
+        badgeVariant: 'rose',
+        description: `Invoice has passed 22 days overdue (final day of sequence). Autonomous cadence paused. Requires human approval for next action.`,
+        actionPrimary: {
+          label: 'Human Approval',
+          actionKey: 'human_approval',
+        },
+        actionSecondary: {
+          label: 'Extend 7 Days',
+          actionKey: 'extend_day22_grace',
+        },
+        details: {
+          daysOverdue: fullInvoice.daysOverdue,
+        },
+      };
+      setFocusItems((prev) => [day22FocusItem, ...prev]);
+    }
 
     // Persist new invoice to Database
     const userId = currentUser?.id || 'local_user';
@@ -924,12 +1089,6 @@ export function DashboardView({
     addToast('warning', 'Dispute Ticket Raised', `Outreach paused on disputed portion for ${invoice.customerCompany}.`);
   };
 
-  // Day 22 Approvals
-  const handleDay22Approve = (item: any, actionKey: string) => {
-    triggerConfetti();
-    addToast('success', 'Action Approved & Executed', `${item.recommendationTitle} for ${item.customerCompany}.`);
-  };
-
   return (
     <div className="flex h-screen overflow-hidden bg-[#FAFAFB] dark:bg-[#07080D] text-zinc-900 dark:text-zinc-100 transition-colors duration-150">
       
@@ -945,6 +1104,9 @@ export function DashboardView({
         setSelectedEntity={setSelectedEntity}
         entities={mockBusinessEntities}
         pendingActionsCount={focusItems.length}
+        userRole={userRole}
+        isDevAllowed={isDevAllowed}
+        onRoleChange={isDevAllowed ? handleRoleChange : undefined}
         onOpenCustomerPortal={() => {
           setSelectedInvoiceForPortal(invoices[0]);
           setIsCustomerPortalOpen(true);
@@ -965,6 +1127,9 @@ export function DashboardView({
           entities={entities}
           pendingActionsCount={focusItems.length}
           currentUser={currentUser}
+          userRole={userRole}
+          isDevAllowed={isDevAllowed}
+          onRoleChange={isDevAllowed ? handleRoleChange : undefined}
           onOpenCustomerPortal={() => {
             setSelectedInvoiceForPortal(invoices[0]);
             setIsCustomerPortalOpen(true);
@@ -1069,33 +1234,11 @@ export function DashboardView({
             </div>
           )}
 
-          {/* VIEW 3: 21-DAY RECOVERY ENGINE (BRD Feature #5) */}
-          {activeTab === 'sequence' && (
+          {/* VIEW 3: 21-DAY RECOVERY ENGINE (BRD Feature #5) - STRICTLY RESTRICTED TO DEVELOPERS */}
+          {activeTab === 'sequence' && isDevAllowed && (
             <div>
               <SequenceEngineBlock
                 planTier={planTier}
-                onUpgradePrompt={handleUpgradePrompt}
-              />
-            </div>
-          )}
-
-          {/* VIEW 4: OMNICHANNEL AI AGENT & CONVERSATIONS (BRD Features #6 & #7) */}
-          {activeTab === 'simulator' && (
-            <div>
-              <OmnichannelSimulatorBlock
-                planTier={planTier}
-                onUpgradePrompt={handleUpgradePrompt}
-                onActionTriggered={(type, desc) => addToast('info', 'Autonomous Action', desc)}
-              />
-            </div>
-          )}
-
-          {/* VIEW 5: DAY 22 LEGAL ESCALATION & APPROVALS (BRD Feature #12) */}
-          {activeTab === 'day22' && (
-            <div>
-              <Day22ApprovalsBlock
-                planTier={planTier}
-                onApproveAction={handleDay22Approve}
                 onUpgradePrompt={handleUpgradePrompt}
               />
             </div>

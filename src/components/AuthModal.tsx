@@ -14,7 +14,7 @@ import {
   Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { UserAccount, PlanTierType } from '../types/auth';
+import { UserAccount, PlanTierType, STORAGE_KEY_ROLE } from '../types/auth';
 import { signUpUser, signInUser, isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthModalProps {
@@ -112,6 +112,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (error || !account) {
         setErrorMsg(error || 'Failed to sign up.');
         return;
+      }
+
+      // Persist active role
+      try {
+        localStorage.setItem(STORAGE_KEY_ROLE, account.role || 'client');
+      } catch (e) {
+        console.warn('Role storage warning', e);
       }
 
       // Confetti celebration

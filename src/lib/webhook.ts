@@ -29,6 +29,7 @@ export interface CreateOrderResponse {
   orderId: string | null;
   amountInPaise: number | null;
   currency: string;
+  keyId?: string | null;
   rawResponse?: any;
 }
 
@@ -118,12 +119,14 @@ export async function createRazorpayOrderViaWebhook(data: CreateOrderRequest): P
           const orderId = orderObj?.id || orderObj?.order_id || orderObj?.orderId || null;
           const returnedAmount = orderObj?.amount !== undefined ? Number(orderObj.amount) : amountInPaise;
           const returnedCurrency = orderObj?.currency || 'INR';
+          const returnedKeyId = orderObj?.key_id || orderObj?.keyId || orderObj?.key || null;
 
           if (orderId && typeof orderId === 'string' && orderId.startsWith('order_')) {
             return {
               orderId,
               amountInPaise: returnedAmount,
               currency: returnedCurrency,
+              keyId: returnedKeyId,
               rawResponse: orderObj,
             };
           }

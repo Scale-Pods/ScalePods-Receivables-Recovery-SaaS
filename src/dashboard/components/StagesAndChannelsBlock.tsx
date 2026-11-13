@@ -54,9 +54,9 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
       activePercent: 75,
     },
     {
-      id: 'Executive/Legal Hold',
+      id: 'Executive Hold',
       name: '4. Executive Hold',
-      description: 'Pre-legal notice & settlement discount',
+      description: 'Executive review & structured settlement',
       count: 4,
       amount: 271000,
       activePercent: 90,

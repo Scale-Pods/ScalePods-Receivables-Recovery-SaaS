@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Invoice, PlanTier, CadenceIntensity } from '../types/dashboard';
 import { UserAccount, STORAGE_KEY_USER } from '../../types/auth';
-import { sendInvoiceExtractionWebhook } from '../../lib/webhook';
+import { sendInvoiceExtractionWebhook, uploadInvoiceToN8nForExtraction } from '../../lib/webhook';
 import { formatINR } from '../utils/formatters';
 
 interface InvoiceIntakeBlockProps {
@@ -41,6 +41,7 @@ interface ParsedInvoicePreview {
   isDuplicate: boolean;
   orderReference?: string | null;
   confidenceScore: number;
+  isN8nExtracted?: boolean;
 }
 
 export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
@@ -339,12 +340,27 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     }, 600);
   };
 
-  // Submit Invoice File for Extraction (Email & Phone are optional / extracted from document if present)
+  // Submit Invoice File for Extraction (Email & Phone are required fields)
   const handleProcessUpload = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
     if (!selectedFile && !selectedSample) {
       setUploadError('Please select or drop an invoice file to extract details.');
+      return;
+    }
+
+    if (!uploadEmail.trim()) {
+      setUploadError('Customer / Debtor Email is required.');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(uploadEmail.trim())) {
+      setUploadError('Please enter a valid Customer / Debtor email address.');
+      return;
+    }
+
+    if (!uploadPhone.trim()) {
+      setUploadError('Phone / WhatsApp Number is required.');
       return;
     }
 
@@ -354,42 +370,135 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     setScannedResult(null);
 
     try {
-      setTimeout(() => setScanProgress(55), 200);
-      setTimeout(() => setScanProgress(85), 450);
+      setScanProgress(35);
+
+      // Encode file to Base64 data URL for n8n webhook
+      let fileBase64: string | null = null;
+      if (selectedFile) {
+        try {
+          fileBase64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(selectedFile);
+          });
+        } catch (readErr) {
+          console.warn('File encoding notice:', readErr);
+        }
+      }
+
+      setScanProgress(55);
+
+      // Send uploaded file as multipart/form-data with required debtor contact details to n8n AI webhook
+      const n8nResult = await uploadInvoiceToN8nForExtraction({
+        file: selectedFile,
+        fileBase64,
+        fileName: uploadedFileName || selectedFile?.name || (selectedSample ? `${selectedSample}.pdf` : 'invoice.pdf'),
+        fileSize: uploadedFileSize || (selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : null),
+        fileType: selectedFile?.type || 'application/pdf',
+        fileSizeBytes: selectedFile?.size,
+        debtorEmail: uploadEmail.trim(),
+        debtorPhone: uploadPhone.trim(),
+        userEmail: effectiveUserEmail,
+        userTier: effectiveUserTier,
+        userName: effectiveUserName,
+        userCompany: effectiveUserCompany,
+      });
+
+      setScanProgress(85);
 
       const sampleMock = selectedSample ? sampleFiles.find(s => s.id === selectedSample)?.mockData : undefined;
-      const parsed = await parseInvoiceFile(selectedFile, uploadEmail, uploadPhone, sampleMock);
+      let parsed: ParsedInvoicePreview;
 
-      setTimeout(() => {
-        setScanProgress(100);
-        setIsScanning(false);
-        setScannedResult(parsed);
+      if (selectedSample && sampleMock) {
+        // Preset sample test data
+        parsed = {
+          ...sampleMock,
+          customerEmail: uploadEmail.trim() || sampleMock.customerEmail,
+          customerPhone: uploadPhone.trim() || sampleMock.customerPhone,
+          isN8nExtracted: false,
+        };
+      } else if (n8nResult.isN8nSuccess) {
+        // Real AI Extraction output returned by n8n
+        const daysOverdue = n8nResult.dueDate 
+          ? Math.max(0, Math.floor((Date.now() - new Date(n8nResult.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
+          : 0;
+        const bucket: 'early' | '15+' | '30+' | '60+' = daysOverdue > 60 
+          ? '60+' 
+          : daysOverdue > 30 
+            ? '30+' 
+            : daysOverdue > 15 
+              ? '15+' 
+              : 'early';
 
-        // Dispatch extracted invoice details to n8n webhook
-        sendInvoiceExtractionWebhook({
-          invoiceNumber: parsed.invoiceNumber,
-          customerCompany: parsed.customerCompany,
-          customerName: parsed.customerName,
-          customerEmail: parsed.customerEmail,
-          customerPhone: parsed.customerPhone,
-          amount: parsed.amount,
-          dueDate: parsed.dueDate,
-          daysOverdue: parsed.daysOverdue,
-          bucket: parsed.bucket,
-          recommendedSequence: parsed.recommendedSequence,
-          confidenceScore: parsed.confidenceScore,
-          fileName: uploadedFileName || selectedFile?.name || null,
-          fileSize: uploadedFileSize || null,
-          userEmail: effectiveUserEmail,
-          userTier: effectiveUserTier,
-          userName: effectiveUserName,
-          userCompany: effectiveUserCompany,
-          timestamp: new Date().toISOString(),
-        });
-      }, 700);
-    } catch {
+        parsed = {
+          invoiceNumber: n8nResult.invoiceNumber,
+          customerCompany: n8nResult.customerCompany,
+          customerName: n8nResult.customerName,
+          customerEmail: uploadEmail.trim() || n8nResult.customerEmail,
+          customerPhone: uploadPhone.trim() || n8nResult.customerPhone,
+          amount: n8nResult.amount,
+          currency: '₹',
+          issueDate: new Date().toISOString().split('T')[0],
+          dueDate: n8nResult.dueDate,
+          daysOverdue,
+          bucket,
+          recommendedSequence: bucket === '60+' || bucket === '30+' ? 'intensive' : bucket === '15+' ? 'standard' : 'light',
+          isDuplicate: false,
+          confidenceScore: n8nResult.confidenceScore || 96,
+          isN8nExtracted: true,
+        };
+      } else {
+        // Document uploaded to n8n, but n8n has not returned extraction output yet:
+        // Strictly show empty/null fields — DO NOT guess or fabricate random data!
+        parsed = {
+          invoiceNumber: null,
+          customerCompany: null,
+          customerName: null,
+          customerEmail: uploadEmail.trim(),
+          customerPhone: uploadPhone.trim(),
+          amount: null,
+          currency: '₹',
+          issueDate: new Date().toISOString().split('T')[0],
+          dueDate: null,
+          daysOverdue: 0,
+          bucket: 'early',
+          recommendedSequence: 'standard',
+          isDuplicate: false,
+          confidenceScore: 0,
+          isN8nExtracted: false,
+        };
+      }
+
+      setScanProgress(100);
       setIsScanning(false);
-      setUploadError('Failed to read invoice file. Please try another file.');
+      setScannedResult(parsed);
+
+      // Dispatch confirmation webhook with extracted invoice details
+      sendInvoiceExtractionWebhook({
+        invoiceNumber: parsed.invoiceNumber,
+        customerCompany: parsed.customerCompany,
+        customerName: parsed.customerName,
+        customerEmail: parsed.customerEmail,
+        customerPhone: parsed.customerPhone,
+        amount: parsed.amount,
+        dueDate: parsed.dueDate,
+        daysOverdue: parsed.daysOverdue,
+        bucket: parsed.bucket,
+        recommendedSequence: parsed.recommendedSequence,
+        confidenceScore: parsed.confidenceScore,
+        fileName: uploadedFileName || selectedFile?.name || null,
+        fileSize: uploadedFileSize || null,
+        userEmail: effectiveUserEmail,
+        userTier: effectiveUserTier,
+        userName: effectiveUserName,
+        userCompany: effectiveUserCompany,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      setIsScanning(false);
+      console.warn('Extraction processing error:', err);
+      setUploadError('Failed to process invoice file. Please try another file.');
     }
   };
 
@@ -637,7 +746,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                 {/* Field 1: Customer / Debtor Email */}
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Customer / Debtor Email
+                    Customer / Debtor Email <span className="text-purple-600 dark:text-purple-400 font-bold">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400">
@@ -645,6 +754,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                     </div>
                     <input
                       type="email"
+                      required
                       value={uploadEmail}
                       onChange={(e) => {
                         setUploadEmail(e.target.value);
@@ -659,7 +769,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                 {/* Field 2: Customer / Debtor Phone */}
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Phone / WhatsApp Number
+                    Phone / WhatsApp Number <span className="text-purple-600 dark:text-purple-400 font-bold">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400">
@@ -667,6 +777,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                     </div>
                     <input
                       type="tel"
+                      required
                       value={uploadPhone}
                       onChange={(e) => {
                         setUploadPhone(e.target.value);
@@ -772,7 +883,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                   {isScanning ? (
                     <>
                       <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Reading Invoice & Extracting Details ({scanProgress}%)...</span>
+                      <span>Processing with n8n AI Extractor ({scanProgress}%)...</span>
                     </>
                   ) : (
                     <>
@@ -833,11 +944,17 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                   </div>
                   {scannedResult && (
                     <span className={`px-2 py-0.5 rounded text-[10px] font-mono border font-semibold ${
-                      scannedResult.confidenceScore >= 80
+                      scannedResult.isN8nExtracted
                         ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+                        : selectedSample
+                        ? 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20'
+                        : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
                     }`}>
-                      {scannedResult.confidenceScore}% Confidence
+                      {scannedResult.isN8nExtracted
+                        ? `${scannedResult.confidenceScore}% AI Confidence`
+                        : selectedSample
+                        ? 'Sample Preset'
+                        : 'Awaiting n8n Output'}
                     </span>
                   )}
                 </div>
@@ -859,12 +976,36 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
 
                 {!isScanning && scannedResult && (
                   <div className="space-y-3">
-                    <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span>Real File Extraction</span>
+                    <div className={`p-2.5 rounded-lg border flex items-center justify-between text-xs ${
+                      scannedResult.isN8nExtracted
+                        ? 'bg-emerald-500/10 border-emerald-500/20'
+                        : selectedSample
+                        ? 'bg-purple-500/10 border-purple-500/20'
+                        : 'bg-zinc-100 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800'
+                    }`}>
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <CheckCircle2 className={`w-3.5 h-3.5 ${
+                          scannedResult.isN8nExtracted 
+                            ? 'text-emerald-600 dark:text-emerald-400' 
+                            : selectedSample
+                            ? 'text-purple-600 dark:text-purple-400'
+                            : 'text-zinc-400'
+                        }`} />
+                        <span className={
+                          scannedResult.isN8nExtracted 
+                            ? 'text-emerald-700 dark:text-emerald-300' 
+                            : selectedSample
+                            ? 'text-purple-700 dark:text-purple-300'
+                            : 'text-zinc-600 dark:text-zinc-400'
+                        }>
+                          {scannedResult.isN8nExtracted 
+                            ? 'n8n AI Vision Extraction' 
+                            : selectedSample
+                            ? 'Sample Test File'
+                            : 'File Sent to n8n Webhook • Awaiting AI Output'}
+                        </span>
                       </div>
-                      <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400">EDITABLE</span>
+                      <span className="text-[10px] font-mono font-bold text-zinc-500">EDITABLE</span>
                     </div>
 
                     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#0E0F16] divide-y divide-zinc-200 dark:divide-zinc-800 text-xs">

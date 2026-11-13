@@ -39,6 +39,9 @@ export function loadRazorpayScript(): Promise<boolean> {
 
 export interface InitiateRazorpayParams {
   amountInINR: number;
+  amountInPaise?: number | null;
+  currency?: string;
+  orderId?: string | null;
   planName: string;
   planId: string;
   billingCycle: 'monthly' | 'annual';
@@ -74,12 +77,15 @@ export async function initiateRazorpayPayment(params: InitiateRazorpayParams): P
 
   // If Razorpay SDK is available and key is configured:
   if (isLoaded && razorpayKey && razorpayKey.startsWith('rzp_')) {
-    const options = {
+    const finalAmount = params.amountInPaise || Math.round(params.amountInINR * 100); // Amount in paise
+    const finalCurrency = params.currency || 'INR';
+
+    const options: any = {
       key: razorpayKey,
-      amount: Math.round(params.amountInINR * 100), // Amount in paise
-      currency: 'INR',
+      amount: finalAmount,
+      currency: finalCurrency,
       name: 'ScalePods Autonomous Recovery',
-      description: `${params.planName} Tier Upgrade (${params.billingCycle === 'annual' ? 'Annual Plan' : 'Monthly Plan'})`,
+      description: `${params.planName} Subscription`,
       image: '/scalepods-logo-dark.png',
       prefill: {
         name: params.userName,
@@ -103,6 +109,11 @@ export async function initiateRazorpayPayment(params: InitiateRazorpayParams): P
         params.onSuccess(response);
       },
     };
+
+    // Attach server-generated order_id if present
+    if (params.orderId) {
+      options.order_id = params.orderId;
+    }
 
     try {
       const rzp = new (window as any).Razorpay(options);

@@ -11,7 +11,11 @@ import {
 import confetti from 'canvas-confetti';
 import { UserAccount, PlanTierType } from '../types/auth';
 import { initiateRazorpayPayment } from '../lib/razorpay';
-import { sendPlanPurchaseWebhook } from '../lib/webhook';
+import { 
+  sendPlanPurchaseWebhook, 
+  createRazorpayOrderViaWebhook, 
+  sendPaymentVerificationWebhook 
+} from '../lib/webhook';
 
 interface TierPurchaseModalProps {
   isOpen: boolean;
@@ -227,33 +231,64 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
       return;
     }
 
-    // Trigger webhook ONLY when clicking "Pay via Razorpay"
-    if (currentUser) {
-      sendPlanPurchaseWebhook({
-        name: currentUser.name,
-        email: currentUser.email,
-        companyName: currentUser.companyName,
-        plan: targetPlan.name,
-        planId: targetPlan.id,
-        billingCycle: billingAnnual ? 'annual' : 'monthly',
-        amount: payableAmount,
-        status: 'pay_via_razorpay_clicked',
-      });
-    }
-
     setIsProcessing(true);
 
+    // 1. Create Razorpay Order via n8n server-side webhook
+    let generatedOrderId: string | null = null;
+    let orderAmountInPaise: number | null = null;
+    let orderCurrency: string = 'INR';
+
+    if (currentUser) {
+      try {
+        const orderResult = await createRazorpayOrderViaWebhook({
+          name: currentUser.name,
+          email: currentUser.email,
+          companyName: currentUser.companyName,
+          plan: targetPlan.name,
+          planId: targetPlan.id,
+          billingCycle: billingAnnual ? 'annual' : 'monthly',
+          amount: payableAmount,
+        });
+
+        if (orderResult.orderId) {
+          generatedOrderId = orderResult.orderId;
+          if (orderResult.amountInPaise) orderAmountInPaise = orderResult.amountInPaise;
+          if (orderResult.currency) orderCurrency = orderResult.currency;
+        }
+      } catch (e) {
+        console.warn('Order webhook call notice:', e);
+      }
+    }
+
+    // 2. Open Razorpay Checkout modal with the generated order_id
     await initiateRazorpayPayment({
       amountInINR: payableAmount,
+      amountInPaise: orderAmountInPaise,
+      currency: orderCurrency,
+      orderId: generatedOrderId,
       planName: targetPlan.name,
       planId: targetPlan.id,
       billingCycle: billingAnnual ? 'annual' : 'monthly',
       companyName: currentUser.companyName,
       userEmail: currentUser.email,
       userName: currentUser.name,
-      onSuccess: (_response) => {
+      onSuccess: async (response) => {
         setIsProcessing(false);
         setIsComplete(true);
+
+        // 3. Send payment details (payment_id, order_id, signature) for verification
+        await sendPaymentVerificationWebhook({
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_order_id: response.razorpay_order_id || generatedOrderId || undefined,
+          razorpay_signature: response.razorpay_signature,
+          name: currentUser.name,
+          email: currentUser.email,
+          companyName: currentUser.companyName,
+          plan: targetPlan.name,
+          planId: targetPlan.id,
+          billingCycle: billingAnnual ? 'annual' : 'monthly',
+          amount: payableAmount,
+        });
 
         // Confetti celebration
         confetti({

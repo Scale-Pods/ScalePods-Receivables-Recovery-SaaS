@@ -30,10 +30,14 @@ export function getRecoveryTableName(tier?: PlanTier | string): string {
   }
 }
 
-const getInvoicesKey = (userId: string, tier: string) => `recovr_db_invoices_${userId || 'guest'}_${tier}`;
-const getCustomersKey = (userId: string, tier: string) => `recovr_db_customers_${userId || 'guest'}_${tier}`;
-const getFocusKey = (userId: string, tier: string) => `recovr_db_focus_${userId || 'guest'}_${tier}`;
-const getPaymentsKey = (userId: string, tier: string) => `recovr_db_payments_${userId || 'guest'}_${tier}`;
+const getInvoicesKey = (userId: string, tier: string, email?: string) => 
+  `recovr_db_invoices_${(email || userId || 'guest').toLowerCase().trim()}_${tier}`;
+const getCustomersKey = (userId: string, tier: string, email?: string) => 
+  `recovr_db_customers_${(email || userId || 'guest').toLowerCase().trim()}_${tier}`;
+const getFocusKey = (userId: string, tier: string, email?: string) => 
+  `recovr_db_focus_${(email || userId || 'guest').toLowerCase().trim()}_${tier}`;
+const getPaymentsKey = (userId: string, tier: string, email?: string) => 
+  `recovr_db_payments_${(email || userId || 'guest').toLowerCase().trim()}_${tier}`;
 
 // --------------------------------------------------------------------------
 // Row <-> Model Adapters for recovery_outreach_* tables
@@ -42,8 +46,8 @@ const getPaymentsKey = (userId: string, tier: string) => `recovr_db_payments_${u
 export function recoveryRowToInvoice(row: any): Invoice {
   const amount = Number(row.overdue_amount || row.debit || row.running_balance || 0);
   const invoiceNumber = row.bill_no || row.voucher_no || `INV-${row.id}`;
-  const partyName = row.party_name || row.customer_name || 'Valued Debtor';
-  const customerEmail = row.email || row.customer_email || '';
+  const partyName = row.party_name || 'Valued Debtor';
+  const customerEmail = row.email || '';
   const customerPhone = row.phone || '';
 
   // 1. Calculate Days Overdue & Due Date
@@ -206,6 +210,35 @@ export function recoveryRowToInvoice(row: any): Invoice {
       description: row.summary || `Touchpoint dispatched via ${latestChannel.toUpperCase()}`,
     });
   }
+  if (row.wa_conversation) {
+    timeline.push({
+      id: `evt-wa-conv-${row.id}`,
+      timestamp: row.updated_at || new Date().toISOString(),
+      channel: 'whatsapp',
+      type: 'whatsapp_sent',
+      title: 'WhatsApp Conversation Log',
+      description: row.wa_conversation,
+    });
+  }
+  if (row.email_conversation) {
+    timeline.push({
+      id: `evt-email-conv-${row.id}`,
+      timestamp: row.updated_at || new Date().toISOString(),
+      channel: 'email',
+      type: 'email_sent',
+      title: 'Email Conversation Log',
+      description: row.email_conversation,
+    });
+  }
+  if (row.intent || row.summary) {
+    timeline.push({
+      id: `evt-ai-summary-${row.id}`,
+      timestamp: row.updated_at || new Date().toISOString(),
+      type: 'customer_reply',
+      title: row.intent ? `AI Debtor Intent: ${row.intent}` : 'AI Interaction Summary',
+      description: row.summary || `Intent registered: ${row.intent}`,
+    });
+  }
   if (row.Payment_Date || row.Final_Amount) {
     timeline.push({
       id: `evt-pay-${row.id}`,
@@ -246,26 +279,41 @@ export function recoveryRowToInvoice(row: any): Invoice {
   };
 }
 
-export function invoiceToRecoveryRow(inv: Invoice, extraProps: Record<string, any> = {}): Record<string, any> {
+export function invoiceToRecoveryRow(
+  inv: Invoice, 
+  extraProps: Record<string, any> = {},
+  user?: { id?: string; email?: string; name?: string; companyName?: string }
+): Record<string, any> {
+  const clientUid = user?.id || extraProps.customer_uid || null;
+  const clientEmail = (user?.email || extraProps.customer_email || '').toLowerCase().trim() || null;
+  const clientName = user?.companyName || user?.name || extraProps.customer_name || null;
+
   return {
     party_name: inv.customerCompany || inv.customerName,
-    customer_name: inv.customerName,
-    customer_email: inv.customerEmail,
     email: inv.customerEmail,
     phone: inv.customerPhone,
     bill_no: inv.invoiceNumber,
     voucher_no: extraProps.voucher_no || `VCH-${inv.invoiceNumber}`,
     overdue_amount: String(inv.amount),
     running_balance: String(inv.amount),
+    debit: String(inv.amount),
+    credit: '0',
     current_stage: inv.currentStage,
     next_action: inv.nextScheduledStep || 'Day 1 Friendly Email',
     next_action_date: inv.dueDate,
     status: inv.status === 'paid' ? 'Paid' : inv.status === 'paused' ? 'Paused' : 'Active',
     closed: inv.status === 'paid' ? 'yes' : 'no',
     transaction_date: inv.dueDate,
+    oldest_due_date: inv.dueDate,
+    max_overdue_days: String(inv.daysOverdue),
     updated_at: new Date().toISOString(),
     Final_Amount: inv.status === 'paid' ? String(inv.amount) : null,
     Payment_Date: inv.status === 'paid' ? new Date().toISOString() : null,
+
+    // Recovr Client Account (Tenant Owner)
+    customer_uid: clientUid,
+    customer_email: clientEmail,
+    customer_name: clientName,
     ...extraProps,
   };
 }
@@ -453,19 +501,30 @@ export interface DashboardDataResult {
  */
 export async function loadDashboardData(
   userId: string,
-  planTier: PlanTier = 'free'
+  planTier: PlanTier = 'free',
+  userEmail?: string
 ): Promise<DashboardDataResult> {
   const safeUserId = userId || 'local_user';
   const targetTable = getRecoveryTableName(planTier);
+  const normalizedEmail = (userEmail || '').toLowerCase().trim();
 
   // 1. Try Supabase Cloud Database using target tier table
   if (isSupabaseConfigured && supabase) {
     try {
-      console.log(`[DashboardDb] Fetching data from Supabase table: ${targetTable} for tier: ${planTier}`);
-      const { data: rows, error } = await supabase
-        .from(targetTable)
-        .select('*')
-        .order('id', { ascending: false });
+      console.log(`[DashboardDb] Fetching data from ${targetTable} for tier: ${planTier}, client: ${normalizedEmail || safeUserId}`);
+      
+      let query = supabase.from(targetTable).select('*');
+
+      // Multi-tenant client isolation: filter rows owned by this client
+      if (normalizedEmail && safeUserId !== 'local_user') {
+        query = query.or(`customer_uid.eq.${safeUserId},customer_email.ilike.${normalizedEmail}`);
+      } else if (normalizedEmail) {
+        query = query.ilike('customer_email', normalizedEmail);
+      } else if (safeUserId !== 'local_user') {
+        query = query.eq('customer_uid', safeUserId);
+      }
+
+      const { data: rows, error } = await query.order('id', { ascending: false });
 
       if (error) {
         console.warn(`[DashboardDb] Query on ${targetTable} notice:`, error);
@@ -477,10 +536,10 @@ export async function loadDashboardData(
         const payments = recoveryRowsToPayments(rows);
 
         // Cache locally for offline speed
-        localStorage.setItem(getInvoicesKey(safeUserId, planTier), JSON.stringify(invoices));
-        localStorage.setItem(getCustomersKey(safeUserId, planTier), JSON.stringify(customers));
-        localStorage.setItem(getFocusKey(safeUserId, planTier), JSON.stringify(focusItems));
-        localStorage.setItem(getPaymentsKey(safeUserId, planTier), JSON.stringify(payments));
+        localStorage.setItem(getInvoicesKey(safeUserId, planTier, normalizedEmail), JSON.stringify(invoices));
+        localStorage.setItem(getCustomersKey(safeUserId, planTier, normalizedEmail), JSON.stringify(customers));
+        localStorage.setItem(getFocusKey(safeUserId, planTier, normalizedEmail), JSON.stringify(focusItems));
+        localStorage.setItem(getPaymentsKey(safeUserId, planTier, normalizedEmail), JSON.stringify(payments));
 
         return {
           invoices,
@@ -497,10 +556,10 @@ export async function loadDashboardData(
 
   // 2. Local Storage Fallback
   try {
-    const rawInvoices = localStorage.getItem(getInvoicesKey(safeUserId, planTier));
-    const rawCustomers = localStorage.getItem(getCustomersKey(safeUserId, planTier));
-    const rawFocus = localStorage.getItem(getFocusKey(safeUserId, planTier));
-    const rawPayments = localStorage.getItem(getPaymentsKey(safeUserId, planTier));
+    const rawInvoices = localStorage.getItem(getInvoicesKey(safeUserId, planTier, normalizedEmail));
+    const rawCustomers = localStorage.getItem(getCustomersKey(safeUserId, planTier, normalizedEmail));
+    const rawFocus = localStorage.getItem(getFocusKey(safeUserId, planTier, normalizedEmail));
+    const rawPayments = localStorage.getItem(getPaymentsKey(safeUserId, planTier, normalizedEmail));
 
     if (rawInvoices && rawCustomers) {
       return {
@@ -526,22 +585,25 @@ export async function loadDashboardData(
 }
 
 /**
- * Adds a new invoice to the active tier's Supabase table
+ * Adds a new invoice to the active tier's Supabase table tagged with the client identity
  */
 export async function addInvoiceToDb(
   userId: string,
   invoice: Invoice,
-  planTier: PlanTier = 'free'
+  planTier: PlanTier = 'free',
+  userEmail?: string,
+  userName?: string
 ): Promise<void> {
   const safeUserId = userId || 'local_user';
   const targetTable = getRecoveryTableName(planTier);
+  const normalizedEmail = (userEmail || '').toLowerCase().trim();
 
   // 1. Update local cache
   try {
-    const raw = localStorage.getItem(getInvoicesKey(safeUserId, planTier)) || '[]';
+    const raw = localStorage.getItem(getInvoicesKey(safeUserId, planTier, normalizedEmail)) || '[]';
     const invoices: Invoice[] = JSON.parse(raw);
     invoices.unshift(invoice);
-    localStorage.setItem(getInvoicesKey(safeUserId, planTier), JSON.stringify(invoices));
+    localStorage.setItem(getInvoicesKey(safeUserId, planTier, normalizedEmail), JSON.stringify(invoices));
   } catch (e) {
     console.warn('Local add invoice warning:', e);
   }
@@ -550,13 +612,15 @@ export async function addInvoiceToDb(
   if (isSupabaseConfigured && supabase) {
     try {
       const row = invoiceToRecoveryRow(invoice, {
-        customer_uid: userId !== 'local_user' ? userId : null,
+        customer_uid: safeUserId !== 'local_user' ? safeUserId : null,
+        customer_email: normalizedEmail || null,
+        customer_name: userName || null,
       });
       const { data, error } = await supabase.from(targetTable).insert([row]).select().single();
       if (error) {
         console.error(`Failed to insert into ${targetTable}:`, error);
       } else if (data) {
-        console.log(`Successfully added invoice ${data.bill_no} (id: ${data.id}) to ${targetTable}`);
+        console.log(`Successfully added invoice ${data.bill_no} (id: ${data.id}) to ${targetTable} for client ${normalizedEmail || safeUserId}`);
       }
     } catch (err) {
       console.error(`Error saving invoice to ${targetTable}:`, err);
@@ -570,19 +634,21 @@ export async function addInvoiceToDb(
 export async function saveInvoiceInDb(
   userId: string,
   invoice: Invoice,
-  planTier: PlanTier = 'free'
+  planTier: PlanTier = 'free',
+  userEmail?: string
 ): Promise<void> {
   const safeUserId = userId || 'local_user';
   const targetTable = getRecoveryTableName(planTier);
+  const normalizedEmail = (userEmail || '').toLowerCase().trim();
 
   // 1. Update Local Cache
   try {
-    const raw = localStorage.getItem(getInvoicesKey(safeUserId, planTier)) || '[]';
+    const raw = localStorage.getItem(getInvoicesKey(safeUserId, planTier, normalizedEmail)) || '[]';
     const invoices: Invoice[] = JSON.parse(raw);
     const idx = invoices.findIndex((i) => i.id === invoice.id);
     if (idx >= 0) invoices[idx] = invoice;
     else invoices.unshift(invoice);
-    localStorage.setItem(getInvoicesKey(safeUserId, planTier), JSON.stringify(invoices));
+    localStorage.setItem(getInvoicesKey(safeUserId, planTier, normalizedEmail), JSON.stringify(invoices));
   } catch (err) {
     console.warn('Local save invoice error:', err);
   }
@@ -590,7 +656,7 @@ export async function saveInvoiceInDb(
   // 2. Update in Supabase targetTable
   if (isSupabaseConfigured && supabase) {
     try {
-      const updateData = {
+      const updateData: Record<string, any> = {
         status: invoice.status === 'paid' ? 'Paid' : invoice.status === 'paused' ? 'Paused' : 'Active',
         current_stage: invoice.currentStage,
         next_action: invoice.nextScheduledStep,
@@ -601,7 +667,11 @@ export async function saveInvoiceInDb(
       if (!isNaN(Number(invoice.id))) {
         await supabase.from(targetTable).update(updateData).eq('id', Number(invoice.id));
       } else {
-        await supabase.from(targetTable).update(updateData).eq('bill_no', invoice.invoiceNumber);
+        let q = supabase.from(targetTable).update(updateData).eq('bill_no', invoice.invoiceNumber);
+        if (normalizedEmail) {
+          q = q.ilike('customer_email', normalizedEmail);
+        }
+        await q;
       }
     } catch (err) {
       console.warn(`Supabase update error on ${targetTable}:`, err);
@@ -617,28 +687,30 @@ export async function recordPaymentInDb(
   payment: PaymentRecord,
   updatedInvoice: Invoice,
   updatedCustomer?: CustomerProfile,
-  planTier: PlanTier = 'free'
+  planTier: PlanTier = 'free',
+  userEmail?: string
 ): Promise<void> {
   const safeUserId = userId || 'local_user';
   const targetTable = getRecoveryTableName(planTier);
+  const normalizedEmail = (userEmail || '').toLowerCase().trim();
 
   // 1. Update Local Cache
   try {
-    const existingPaymentsRaw = localStorage.getItem(getPaymentsKey(safeUserId, planTier)) || '[]';
+    const existingPaymentsRaw = localStorage.getItem(getPaymentsKey(safeUserId, planTier, normalizedEmail)) || '[]';
     const payments: PaymentRecord[] = JSON.parse(existingPaymentsRaw);
     payments.unshift(payment);
-    localStorage.setItem(getPaymentsKey(safeUserId, planTier), JSON.stringify(payments));
+    localStorage.setItem(getPaymentsKey(safeUserId, planTier, normalizedEmail), JSON.stringify(payments));
 
-    const existingInvoicesRaw = localStorage.getItem(getInvoicesKey(safeUserId, planTier)) || '[]';
+    const existingInvoicesRaw = localStorage.getItem(getInvoicesKey(safeUserId, planTier, normalizedEmail)) || '[]';
     const invoices: Invoice[] = JSON.parse(existingInvoicesRaw);
     const updatedInvoices = invoices.map((inv) => (inv.id === updatedInvoice.id ? updatedInvoice : inv));
-    localStorage.setItem(getInvoicesKey(safeUserId, planTier), JSON.stringify(updatedInvoices));
+    localStorage.setItem(getInvoicesKey(safeUserId, planTier, normalizedEmail), JSON.stringify(updatedInvoices));
 
     if (updatedCustomer) {
-      const existingCustomersRaw = localStorage.getItem(getCustomersKey(safeUserId, planTier)) || '{}';
+      const existingCustomersRaw = localStorage.getItem(getCustomersKey(safeUserId, planTier, normalizedEmail)) || '{}';
       const customers: Record<string, CustomerProfile> = JSON.parse(existingCustomersRaw);
       customers[updatedCustomer.id] = updatedCustomer;
-      localStorage.setItem(getCustomersKey(safeUserId, planTier), JSON.stringify(customers));
+      localStorage.setItem(getCustomersKey(safeUserId, planTier, normalizedEmail), JSON.stringify(customers));
     }
   } catch (err) {
     console.warn('Local payment cache update error:', err);
@@ -659,7 +731,11 @@ export async function recordPaymentInDb(
       if (!isNaN(Number(updatedInvoice.id))) {
         await supabase.from(targetTable).update(updateData).eq('id', Number(updatedInvoice.id));
       } else {
-        await supabase.from(targetTable).update(updateData).eq('bill_no', updatedInvoice.invoiceNumber);
+        let q = supabase.from(targetTable).update(updateData).eq('bill_no', updatedInvoice.invoiceNumber);
+        if (normalizedEmail) {
+          q = q.ilike('customer_email', normalizedEmail);
+        }
+        await q;
       }
     } catch (cloudErr) {
       console.warn(`Supabase payment sync note on ${targetTable}:`, cloudErr);
@@ -673,14 +749,16 @@ export async function recordPaymentInDb(
 export async function saveCustomerInDb(
   userId: string,
   customer: CustomerProfile,
-  planTier: PlanTier = 'free'
+  planTier: PlanTier = 'free',
+  userEmail?: string
 ): Promise<void> {
   const safeUserId = userId || 'local_user';
+  const normalizedEmail = (userEmail || '').toLowerCase().trim();
   try {
-    const raw = localStorage.getItem(getCustomersKey(safeUserId, planTier)) || '{}';
+    const raw = localStorage.getItem(getCustomersKey(safeUserId, planTier, normalizedEmail)) || '{}';
     const customers: Record<string, CustomerProfile> = JSON.parse(raw);
     customers[customer.id] = customer;
-    localStorage.setItem(getCustomersKey(safeUserId, planTier), JSON.stringify(customers));
+    localStorage.setItem(getCustomersKey(safeUserId, planTier, normalizedEmail), JSON.stringify(customers));
   } catch (err) {
     console.warn('Local save customer error:', err);
   }
@@ -692,11 +770,13 @@ export async function saveCustomerInDb(
 export async function syncFocusItemsInDb(
   userId: string,
   items: FocusItem[],
-  planTier: PlanTier = 'free'
+  planTier: PlanTier = 'free',
+  userEmail?: string
 ): Promise<void> {
   const safeUserId = userId || 'local_user';
+  const normalizedEmail = (userEmail || '').toLowerCase().trim();
   try {
-    localStorage.setItem(getFocusKey(safeUserId, planTier), JSON.stringify(items));
+    localStorage.setItem(getFocusKey(safeUserId, planTier, normalizedEmail), JSON.stringify(items));
   } catch (err) {
     console.warn('Local sync focus items error:', err);
   }

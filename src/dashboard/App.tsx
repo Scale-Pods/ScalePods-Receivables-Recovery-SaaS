@@ -188,7 +188,8 @@ export function DashboardView({
       setIsDbLoading(true);
       try {
         const userId = currentUser?.id || 'local_user';
-        const res = await loadDashboardData(userId, planTier);
+        const userEmail = currentUser?.email;
+        const res = await loadDashboardData(userId, planTier, userEmail);
         if (isMounted) {
           setInvoices(res.invoices);
           setCustomers(res.customers);
@@ -236,7 +237,7 @@ export function DashboardView({
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.id, planTier]);
+  }, [currentUser?.id, currentUser?.email, planTier]);
 
   // Modals & Drawer states
   const [selectedInvoiceForTimeline, setSelectedInvoiceForTimeline] = useState<Invoice | null>(null);
@@ -392,8 +393,9 @@ export function DashboardView({
 
     // Persist Payment, Invoice & Customer to Database
     const userId = currentUser?.id || 'local_user';
-    recordPaymentInDb(userId, paymentRecord, updatedInv, updatedCust, planTier);
-    syncFocusItemsInDb(userId, remainingFocus, planTier);
+    const userEmail = currentUser?.email;
+    recordPaymentInDb(userId, paymentRecord, updatedInv, updatedCust, planTier, userEmail);
+    syncFocusItemsInDb(userId, remainingFocus, planTier, userEmail);
 
     if (selectedInvoiceForTimeline?.id === invoice.id) {
       setSelectedInvoiceForTimeline(updatedInv);
@@ -444,7 +446,7 @@ export function DashboardView({
         })
       );
       const userId = currentUser?.id || 'local_user';
-      saveInvoiceInDb(userId, updatedInv, planTier);
+      saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
       addToast('info', 'Outreach Resumed', `Active dunning resumed for ${invoice.customerCompany}.`);
     } else {
       setSelectedInvoiceForPause(invoice);
@@ -476,7 +478,7 @@ export function DashboardView({
       })
     );
     const userId = currentUser?.id || 'local_user';
-    saveInvoiceInDb(userId, updatedInv, planTier);
+    saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
     setSelectedInvoiceForPause(null);
     addToast('warning', `Outreach Paused (${duration})`, `${invoice.customerCompany}: ${reason}`);
   };
@@ -512,7 +514,7 @@ export function DashboardView({
       })
     );
     const userId = currentUser?.id || 'local_user';
-    saveInvoiceInDb(userId, updatedInv, planTier);
+    saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
     addToast('success', 'Nudge Dispatched', `Urgent notice sent to ${invoice.customerName}.`);
   };
 
@@ -554,7 +556,7 @@ export function DashboardView({
       })
     );
     const userId = currentUser?.id || 'local_user';
-    saveInvoiceInDb(userId, updatedInv, planTier);
+    saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
     setSelectedInvoiceForBucket(null);
     addToast('info', 'Bucket Reassigned', `Invoice #${invoice.invoiceNumber} moved to ${newBucket.toUpperCase()}.`);
   };
@@ -593,8 +595,8 @@ export function DashboardView({
     setFocusItems(remainingFocus);
 
     const userId = currentUser?.id || 'local_user';
-    saveInvoiceInDb(userId, updatedInv, planTier);
-    syncFocusItemsInDb(userId, remainingFocus, planTier);
+    saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
+    syncFocusItemsInDb(userId, remainingFocus, planTier, currentUser?.email);
 
     setSelectedInvoiceForTicket(null);
     addToast('success', 'Ticket Resolved', `Response & corrected invoice PDF sent to ${invoice.customerCompany}.`);
@@ -629,8 +631,8 @@ export function DashboardView({
     setFocusItems(remainingFocus);
 
     const userId = currentUser?.id || 'local_user';
-    saveInvoiceInDb(userId, updatedInv, planTier);
-    syncFocusItemsInDb(userId, remainingFocus, planTier);
+    saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
+    syncFocusItemsInDb(userId, remainingFocus, planTier, currentUser?.email);
 
     triggerConfetti();
     addToast(
@@ -694,7 +696,7 @@ export function DashboardView({
             ],
           };
           const userId = currentUser?.id || 'local_user';
-          saveInvoiceInDb(userId, invUpdated, planTier);
+          saveInvoiceInDb(userId, invUpdated, planTier, currentUser?.email);
           return invUpdated;
         }
         return inv;
@@ -703,7 +705,7 @@ export function DashboardView({
 
     const userId = currentUser?.id || 'local_user';
     if (updatedCust) {
-      saveCustomerInDb(userId, updatedCust, planTier);
+      saveCustomerInDb(userId, updatedCust, planTier, currentUser?.email);
     }
 
     setSelectedCustomerForRisk(null);
@@ -923,7 +925,13 @@ export function DashboardView({
 
     // Persist new invoice to Database
     const userId = currentUser?.id || 'local_user';
-    addInvoiceToDb(userId, fullInvoice, planTier);
+    addInvoiceToDb(
+      userId, 
+      fullInvoice, 
+      planTier, 
+      currentUser?.email, 
+      currentUser?.companyName || currentUser?.name
+    );
 
     triggerConfetti();
     addToast(
@@ -980,8 +988,8 @@ export function DashboardView({
       setPayments((prev) => [partPayment, ...prev]);
 
       const userId = currentUser?.id || 'local_user';
-      saveInvoiceInDb(userId, updatedInv, planTier);
-      recordPaymentInDb(userId, partPayment, updatedInv, undefined, planTier);
+      saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
+      recordPaymentInDb(userId, partPayment, updatedInv, undefined, planTier, currentUser?.email);
 
       addToast('info', 'Part Payment Recorded', `${formatINR(amountPaid)} recorded in database. Remaining balance: ${formatINR(newBalance)}.`);
     }

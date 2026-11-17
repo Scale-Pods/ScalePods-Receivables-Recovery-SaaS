@@ -11,10 +11,12 @@ import {
   Plus, 
   Moon, 
   Sun, 
-  CheckCircle2
+  CheckCircle2,
+  Zap
 } from 'lucide-react';
 import { PlanTier, BusinessEntity } from '../types/dashboard';
 import { UserRole } from '../../types/auth';
+import { QuotaUsage } from '../utils/quota';
 
 export type ActiveTab = 
   | 'overview' 
@@ -40,6 +42,8 @@ interface SidebarProps {
   onRoleChange?: (role: UserRole) => void;
   onOpenCustomerPortal: () => void;
   onOpenPlanSettings: () => void;
+  quota?: QuotaUsage;
+  onOpenTopUp?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -53,6 +57,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isDevAllowed = false,
   onOpenCustomerPortal,
   onOpenPlanSettings,
+  quota,
+  onOpenTopUp,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -198,7 +204,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Bottom Controls */}
-      <div className="border-t border-zinc-200 dark:border-zinc-800/80 p-3 space-y-1.5">
+      <div className="border-t border-zinc-200 dark:border-zinc-800/80 p-3 space-y-2">
+        {/* Monthly Quota Mini Card */}
+        {!isCollapsed && quota && (
+          <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[11px] text-zinc-500 dark:text-zinc-400">Monthly Quota</span>
+              {onOpenTopUp && (
+                <button
+                  onClick={onOpenTopUp}
+                  className="text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                  title="Top-up quota"
+                >
+                  <Zap className="w-2.5 h-2.5" />
+                  <span>Top Up</span>
+                </button>
+              )}
+            </div>
+
+            {/* Invoices Meter */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-zinc-600 dark:text-zinc-300">Invoices</span>
+                <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100">
+                  {quota.invoicesUsed} / {quota.isCustom ? '∞' : quota.invoiceLimit}
+                </span>
+              </div>
+              <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    quota.isInvoiceLimitReached ? 'bg-rose-500' : quota.invoicePercent > 80 ? 'bg-amber-500' : 'bg-purple-500'
+                  }`}
+                  style={{ width: `${quota.invoicePercent}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Voice Calls Meter */}
+            {quota.voiceMinutesLimit > 0 ? (
+              <div className="space-y-1 pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-zinc-600 dark:text-zinc-300">Voice AI</span>
+                  <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100">
+                    {quota.voiceMinutesUsed} / {quota.isCustom ? '∞' : `${quota.voiceMinutesLimit}m`}
+                  </span>
+                </div>
+                <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${quota.voicePercent}%` }}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         <button
           onClick={onOpenPlanSettings}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer"

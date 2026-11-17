@@ -44,6 +44,8 @@ import { SequenceEngineBlock } from './components/SequenceEngineBlock';
 import { InvoiceIntakeBlock } from './components/InvoiceIntakeBlock';
 import { CustomerPortalModal } from './components/CustomerPortalModal';
 import { PlanSettingsModal } from './components/PlanSettingsModal';
+import { TopUpModal } from './components/TopUpModal';
+import { calculateQuotaUsage, TopUpState } from './utils/quota';
 import { TimelineDrawer } from './components/TimelineDrawer';
 import { ProofModal } from './components/ProofModal';
 import { PauseModal, ChangeBucketModal, AnswerTicketModal } from './components/ActionModals';
@@ -249,6 +251,56 @@ export function DashboardView({
 
   // Toast notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Quota & Top-up state (Feature #13: Usage meters & Top-ups)
+  const [isTopUpOpen, setIsTopUpOpen] = useState<boolean>(false);
+  const [topUpState, setTopUpState] = useState<TopUpState>(() => {
+    try {
+      const stored = localStorage.getItem(`recovr_topup_${currentUser?.email || 'guest'}`);
+      return stored ? JSON.parse(stored) : { extraInvoices: 0, extraMinutes: 0 };
+    } catch {
+      return { extraInvoices: 0, extraMinutes: 0 };
+    }
+  });
+
+  const voiceMinutesUsed = React.useMemo(() => {
+    let total = 0;
+    for (const inv of invoices) {
+      if (inv.lastTouch?.channel === 'voice') total += 3;
+      if (inv.timeline) {
+        for (const t of inv.timeline) {
+          if (t.channel === 'voice' || t.type === 'voice_call') total += 3;
+        }
+      }
+    }
+    return total;
+  }, [invoices]);
+
+  const quota = React.useMemo(() => {
+    return calculateQuotaUsage(planTier, invoices.length, voiceMinutesUsed, topUpState);
+  }, [planTier, invoices.length, voiceMinutesUsed, topUpState]);
+
+  const handleApplyTopUp = (extraInvoices: number, extraMinutes: number, packName: string) => {
+    setTopUpState((prev) => {
+      const next = {
+        extraInvoices: prev.extraInvoices + extraInvoices,
+        extraMinutes: prev.extraMinutes + extraMinutes,
+      };
+      try {
+        localStorage.setItem(`recovr_topup_${currentUser?.email || 'guest'}`, JSON.stringify(next));
+      } catch (e) {
+        console.warn('Failed to save topup to local storage', e);
+      }
+      return next;
+    });
+    setIsTopUpOpen(false);
+    triggerConfetti();
+    addToast(
+      'success',
+      `Top-Up Activated: ${packName}`,
+      `Added ${extraInvoices > 0 ? `+${extraInvoices} invoice slots` : `+${extraMinutes} AI voice minutes`} to your active monthly capacity.`
+    );
+  };
 
   // Toggle dark class
   useEffect(() => {
@@ -853,6 +905,17 @@ export function DashboardView({
 
   // Smart Intake: Add newly parsed or manual invoice
   const handleAddInvoice = (newInv: Partial<Invoice>) => {
+    // Check monthly quota before adding (Feature #13: Quota enforcement)
+    if (quota.isInvoiceLimitReached) {
+      addToast(
+        'warning', 
+        'Monthly Intake Limit Reached', 
+        `You have reached your limit of ${quota.invoiceLimit} invoices on the ${planTier.toUpperCase()} plan. Upgrade or Top-Up to continue.`
+      );
+      setIsTopUpOpen(true);
+      return;
+    }
+
     const invoiceId = `inv-${Date.now()}`;
     const invNumber = newInv.invoiceNumber || `INV-${Date.now().toString().slice(-4)}`;
     const fullInvoice: Invoice = {
@@ -1124,6 +1187,8 @@ export function DashboardView({
           setIsCustomerPortalOpen(true);
         }}
         onOpenPlanSettings={() => setIsPlanSettingsOpen(true)}
+        quota={quota}
+        onOpenTopUp={() => setIsTopUpOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -1242,6 +1307,8 @@ export function DashboardView({
                 currentUser={currentUser}
                 onAddInvoice={handleAddInvoice}
                 onUpgradePrompt={handleUpgradePrompt}
+                quota={quota}
+                onOpenTopUp={() => setIsTopUpOpen(true)}
               />
             </div>
           )}
@@ -1370,6 +1437,12 @@ export function DashboardView({
       {isPlanSettingsOpen && (
         <PlanSettingsModal
           currentTier={planTier}
+          quota={quota}
+          onOpenTopUp={() => {
+            setIsPlanSettingsOpen(false);
+            setIsTopUpOpen(true);
+          }}
+          onOpenUpgrade={onOpenUpgrade}
           onSelectTier={(_tier) => {
             setIsPlanSettingsOpen(false);
             if (onOpenUpgrade) {
@@ -1377,6 +1450,17 @@ export function DashboardView({
             }
           }}
           onClose={() => setIsPlanSettingsOpen(false)}
+        />
+      )}
+
+      {/* Resource Top-Up & Quota Packs Modal (Feature #13) */}
+      {isTopUpOpen && (
+        <TopUpModal
+          planTier={planTier}
+          quota={quota}
+          onApplyTopUp={handleApplyTopUp}
+          onOpenUpgrade={onOpenUpgrade}
+          onClose={() => setIsTopUpOpen(false)}
         />
       )}
 

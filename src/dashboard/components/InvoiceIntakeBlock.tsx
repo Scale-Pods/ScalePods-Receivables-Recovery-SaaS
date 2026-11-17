@@ -17,12 +17,15 @@ import { Invoice, PlanTier, CadenceIntensity } from '../types/dashboard';
 import { UserAccount, STORAGE_KEY_USER } from '../../types/auth';
 import { sendInvoiceExtractionWebhook, uploadInvoiceToN8nForExtraction } from '../../lib/webhook';
 import { formatINR } from '../utils/formatters';
+import { QuotaUsage } from '../utils/quota';
 
 interface InvoiceIntakeBlockProps {
   planTier: PlanTier;
   currentUser?: UserAccount | null;
   onAddInvoice: (newInvoice: Partial<Invoice>) => void;
   onUpgradePrompt: (tier: PlanTier) => void;
+  quota?: QuotaUsage;
+  onOpenTopUp?: () => void;
 }
 
 interface ParsedInvoicePreview {
@@ -49,6 +52,8 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   currentUser,
   onAddInvoice,
   onUpgradePrompt,
+  quota,
+  onOpenTopUp,
 }) => {
   const [activeTab, setActiveTab] = useState<'smart_upload' | 'manual_form' | 'connectors'>('smart_upload');
 
@@ -505,6 +510,13 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   // Enroll parsed invoice into live dashboard queue
   const handleEnrollScanned = () => {
     if (!scannedResult) return;
+
+    if (quota?.isInvoiceLimitReached) {
+      setUploadError(`Monthly quota of ${quota.invoiceLimit} invoices reached for ${planTier.toUpperCase()} tier. Please top up or upgrade to continue.`);
+      if (onOpenTopUp) onOpenTopUp();
+      return;
+    }
+
     onAddInvoice({
       invoiceNumber: scannedResult.invoiceNumber || `INV-${Date.now().toString().slice(-4)}`,
       customerCompany: scannedResult.customerCompany || 'Unspecified Client',
@@ -649,6 +661,11 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   const handleEnrollManual = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCompany || !manualInvoiceNo) return;
+
+    if (quota?.isInvoiceLimitReached) {
+      if (onOpenTopUp) onOpenTopUp();
+      return;
+    }
     
     const bucket = getManualBucket(manualDueDate);
     const cadence: CadenceIntensity = bucket === '60+' ? 'intensive' : bucket === '30+' ? 'standard' : 'light';
@@ -723,6 +740,63 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Monthly Quota Alert / Usage Banner */}
+      {quota && (
+        <div
+          className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-all ${
+            quota.isInvoiceLimitReached
+              ? 'bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-300'
+              : quota.invoicePercent > 80
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300'
+              : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-300'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {quota.isInvoiceLimitReached ? (
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+            ) : (
+              <FileText className="w-4 h-4 text-purple-500 shrink-0" />
+            )}
+            <div>
+              <span className="font-bold text-zinc-900 dark:text-white mr-1.5">
+                Monthly Intake Quota:
+              </span>
+              <span className="font-mono font-semibold">
+                {quota.invoicesUsed} / {quota.isCustom ? 'Custom' : quota.invoiceLimit} Used ({quota.invoicePercent}%)
+              </span>
+              <span className="ml-1.5 opacity-80">
+                {quota.isCustom
+                  ? '• Unlimited Enterprise intake'
+                  : quota.isInvoiceLimitReached
+                  ? '• Monthly quota reached'
+                  : `• ${quota.invoicesRemaining} slots remaining`}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {onOpenTopUp && (
+              <button
+                type="button"
+                onClick={onOpenTopUp}
+                className="px-2.5 py-1 rounded-lg bg-purple-600/15 hover:bg-purple-600/25 text-purple-700 dark:text-purple-300 font-bold border border-purple-500/30 transition-colors cursor-pointer"
+              >
+                + Top Up Slots
+              </button>
+            )}
+            {quota.isInvoiceLimitReached && onUpgradePrompt && (
+              <button
+                type="button"
+                onClick={() => onUpgradePrompt(planTier === 'free' ? 'basic' : 'growth')}
+                className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold transition-colors cursor-pointer shadow-xs"
+              >
+                Upgrade Plan
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* TAB 1: SMART AI UPLOAD & OCR */}
       {activeTab === 'smart_upload' && (

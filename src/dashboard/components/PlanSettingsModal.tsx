@@ -7,18 +7,27 @@ import {
   Clock,
   ShieldCheck,
   CheckCircle2,
-  Activity
+  Activity,
+  Zap,
+  ArrowRight
 } from 'lucide-react';
 import { PlanTier } from '../types/dashboard';
+import { QuotaUsage } from '../utils/quota';
 
 interface PlanSettingsModalProps {
   currentTier: PlanTier;
+  quota?: QuotaUsage;
+  onOpenTopUp?: () => void;
+  onOpenUpgrade?: () => void;
   onSelectTier?: (tier: PlanTier) => void;
   onClose: () => void;
 }
 
 export const PlanSettingsModal: React.FC<PlanSettingsModalProps> = ({
   currentTier,
+  quota,
+  onOpenTopUp,
+  onOpenUpgrade,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'meters' | 'calling_hours' | 'safety'>('meters');
@@ -76,11 +85,26 @@ export const PlanSettingsModal: React.FC<PlanSettingsModalProps> = ({
         {/* TAB 1: USAGE METERS */}
         {activeTab === 'meters' && (
           <div className="p-6 space-y-6">
-            <div>
-              <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-1">Monthly Recovery Resource Quotas</h4>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Track invoice enrollment limits, voice call minutes, and automated touches for your active tier.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-1">Monthly Recovery Resource Quotas</h4>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Track invoice enrollment limits, voice call minutes, and top-up reserves for your active tier.
+                </p>
+              </div>
+
+              {onOpenTopUp && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenTopUp();
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors shadow-xs cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>+ Top Up Capacity</span>
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -89,14 +113,30 @@ export const PlanSettingsModal: React.FC<PlanSettingsModalProps> = ({
               <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#0E0F16] space-y-3">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-zinc-900 dark:text-white">Invoices Entering Recovery</span>
-                  <span className="font-mono text-purple-600 dark:text-purple-300 font-bold">42 / 300 Used (14%)</span>
+                  <span className="font-mono text-purple-600 dark:text-purple-300 font-bold">
+                    {quota 
+                      ? `${quota.invoicesUsed} / ${quota.isCustom ? 'Custom' : quota.invoiceLimit} Used (${quota.invoicePercent}%)`
+                      : 'Active'}
+                  </span>
                 </div>
                 <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-purple-500 h-2 rounded-full w-[14%]" />
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      quota?.isInvoiceLimitReached ? 'bg-rose-500' : (quota?.invoicePercent ?? 0) > 80 ? 'bg-amber-500' : 'bg-purple-500'
+                    }`}
+                    style={{ width: `${quota?.invoicePercent ?? 0}%` }}
+                  />
                 </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  Resets on 1st of next month. 258 invoice slots remaining under Growth plan.
-                </p>
+                <div className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <span>
+                    {quota?.isCustom 
+                      ? 'Enterprise unlimited quota' 
+                      : `${quota?.invoicesRemaining ?? 0} invoice slots remaining this month`}
+                  </span>
+                  {quota?.isInvoiceLimitReached && (
+                    <span className="text-rose-500 font-bold">Limit Reached</span>
+                  )}
+                </div>
               </div>
 
               {/* Meter 2: AI Voice Calling Minutes */}
@@ -106,17 +146,45 @@ export const PlanSettingsModal: React.FC<PlanSettingsModalProps> = ({
                     <PhoneCall className="w-3.5 h-3.5 text-purple-500" />
                     AI Voice Call Minutes
                   </span>
-                  <span className="font-mono text-purple-600 dark:text-purple-300 font-bold">38 / 90 Mins (42%)</span>
+                  <span className="font-mono text-purple-600 dark:text-purple-300 font-bold">
+                    {quota && quota.voiceMinutesLimit > 0
+                      ? `${quota.voiceMinutesUsed} / ${quota.isCustom ? 'Custom' : quota.voiceMinutesLimit} Mins (${quota.voicePercent}%)`
+                      : '0 Mins (Locked)'}
+                  </span>
                 </div>
                 <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full w-[42%]" />
+                  <div 
+                    className="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${quota?.voicePercent ?? 0}%` }}
+                  />
                 </div>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  52 minutes remaining. Automated voice blitz triggers during Days 17–21.
+                  {currentTier === 'free' || currentTier === 'basic'
+                    ? 'Voice calls are locked on Free & Basic. Upgrade to Growth (includes 90 mins/month).'
+                    : `${quota?.voiceMinutesRemaining ?? 0} mins remaining. Automated voice blitz triggers during Days 17–21.`}
                 </p>
               </div>
 
             </div>
+
+            {/* Quick Actions / Upgrade Notice */}
+            {onOpenUpgrade && currentTier !== 'enterprise' && (
+              <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/40 flex items-center justify-between text-xs">
+                <span className="text-zinc-600 dark:text-zinc-300">
+                  Need a higher permanent monthly recovery volume?
+                </span>
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenUpgrade();
+                  }}
+                  className="font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                >
+                  <span>Explore Upgrades</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
         )}
 

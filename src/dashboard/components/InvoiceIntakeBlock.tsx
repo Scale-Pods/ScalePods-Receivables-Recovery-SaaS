@@ -404,6 +404,8 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
         fileSizeBytes: selectedFile?.size,
         debtorEmail: uploadEmail.trim(),
         debtorPhone: uploadPhone.trim(),
+        userId: currentUser?.id,
+        clientId: currentUser?.id,
         userEmail: effectiveUserEmail,
         userTier: effectiveUserTier,
         userName: effectiveUserName,
@@ -423,8 +425,8 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
           customerPhone: uploadPhone.trim() || sampleMock.customerPhone,
           isN8nExtracted: false,
         };
-      } else if (n8nResult.isN8nSuccess) {
-        // Real AI Extraction output returned by n8n
+      } else if (n8nResult.isN8nSuccess && (n8nResult.invoiceNumber || n8nResult.amount !== null)) {
+        // Real AI Extraction output returned synchronously by n8n
         const daysOverdue = n8nResult.dueDate 
           ? Math.max(0, Math.floor((Date.now() - new Date(n8nResult.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
           : 0;
@@ -454,9 +456,17 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
           isN8nExtracted: true,
         };
       } else {
-        // Document uploaded to n8n, but n8n has not returned extraction output yet:
-        // Strictly show empty/null fields — DO NOT guess or fabricate random data!
-        parsed = {
+        // Fallback: parse document client-side so fields are populated and user can inspect/edit
+        let localExtracted: ParsedInvoicePreview | null = null;
+        if (selectedFile) {
+          try {
+            localExtracted = await parseInvoiceFile(selectedFile, uploadEmail, uploadPhone);
+          } catch (e) {
+            console.warn('Client-side parsing fallback notice:', e);
+          }
+        }
+
+        parsed = localExtracted || {
           invoiceNumber: null,
           customerCompany: null,
           customerName: null,
@@ -478,28 +488,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       setScanProgress(100);
       setIsScanning(false);
       setScannedResult(parsed);
-
-      // Dispatch confirmation webhook with extracted invoice details
-      sendInvoiceExtractionWebhook({
-        invoiceNumber: parsed.invoiceNumber,
-        customerCompany: parsed.customerCompany,
-        customerName: parsed.customerName,
-        customerEmail: parsed.customerEmail,
-        customerPhone: parsed.customerPhone,
-        amount: parsed.amount,
-        dueDate: parsed.dueDate,
-        daysOverdue: parsed.daysOverdue,
-        bucket: parsed.bucket,
-        recommendedSequence: parsed.recommendedSequence,
-        confidenceScore: parsed.confidenceScore,
-        fileName: uploadedFileName || selectedFile?.name || null,
-        fileSize: uploadedFileSize || null,
-        userEmail: effectiveUserEmail,
-        userTier: effectiveUserTier,
-        userName: effectiveUserName,
-        userCompany: effectiveUserCompany,
-        timestamp: new Date().toISOString(),
-      });
     } catch (err) {
       setIsScanning(false);
       console.warn('Extraction processing error:', err);

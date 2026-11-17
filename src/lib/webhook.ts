@@ -309,6 +309,8 @@ export interface InvoiceUploadExtractionRequest {
   fileSizeBytes?: number;
   debtorEmail: string;
   debtorPhone: string;
+  userId?: string;
+  clientId?: string;
   userEmail: string;
   userTier: string;
   userName?: string;
@@ -325,6 +327,7 @@ export interface N8nExtractedInvoiceResponse {
   dueDate: string | null;
   confidenceScore?: number;
   isN8nSuccess: boolean;
+  isWorkflowStarted?: boolean;
   rawResponse?: any;
 }
 
@@ -343,9 +346,10 @@ export async function uploadInvoiceToN8nForExtraction(
   // Build multipart/form-data payload
   const formData = new FormData();
 
-  // 1. Raw File binary (makes file directly viewable & downloadable in n8n UI)
+  // 1. Raw File binary (supports both 'file' and n8n's default 'data' binary property names)
   if (data.file) {
     formData.append('file', data.file, data.fileName || data.file.name);
+    formData.append('data', data.file, data.fileName || data.file.name);
   }
 
   // 2. Action trigger & status
@@ -371,6 +375,11 @@ export async function uploadInvoiceToN8nForExtraction(
   }
 
   // 5. Active Subscriber Context
+  const clientId = data.clientId || data.userId || '';
+  if (clientId) {
+    formData.append('clientId', clientId);
+    formData.append('userId', clientId);
+  }
   formData.append('userEmail', data.userEmail || '');
   formData.append('userTier', data.userTier || 'free');
   formData.append('userName', data.userName || '');
@@ -387,6 +396,9 @@ export async function uploadInvoiceToN8nForExtraction(
       if (text) {
         try {
           const json = JSON.parse(text);
+          const isStarted = Boolean(
+            json && (json.message === 'Workflow was started' || json.status === 'started' || json.success === true)
+          );
           const extracted = Array.isArray(json) ? json[0] : (json.data || json.extracted || json.result || json);
 
           // Check if n8n returned any extracted fields
@@ -417,7 +429,23 @@ export async function uploadInvoiceToN8nForExtraction(
               dueDate: extracted.dueDate || extracted.due_date || null,
               confidenceScore: extracted.confidenceScore || extracted.confidence || 96,
               isN8nSuccess: true,
+              isWorkflowStarted: true,
               rawResponse: extracted,
+            };
+          }
+
+          if (isStarted) {
+            return {
+              invoiceNumber: null,
+              customerCompany: null,
+              customerName: null,
+              customerEmail: data.debtorEmail,
+              customerPhone: data.debtorPhone,
+              amount: null,
+              dueDate: null,
+              isN8nSuccess: false,
+              isWorkflowStarted: true,
+              rawResponse: json,
             };
           }
         } catch (e) {
@@ -438,6 +466,7 @@ export async function uploadInvoiceToN8nForExtraction(
     amount: null,
     dueDate: null,
     isN8nSuccess: false,
+    isWorkflowStarted: false,
   };
 }
 

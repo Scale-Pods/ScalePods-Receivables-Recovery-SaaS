@@ -49,12 +49,11 @@ import { calculateQuotaUsage, TopUpState } from './utils/quota';
 import { TimelineDrawer } from './components/TimelineDrawer';
 import { ProofModal } from './components/ProofModal';
 import { PauseModal, ChangeBucketModal, AnswerTicketModal } from './components/ActionModals';
-import { User, Code2, Sun, Moon, LogOut } from 'lucide-react';
+import { Sun, Moon, LogOut } from 'lucide-react';
 import { CustomerRiskModal } from './components/CustomerRiskModal';
 import { NotificationToast, ToastMessage } from './components/NotificationToast';
 import { formatINR } from './utils/formatters';
-import { UserAccount, UserRole, STORAGE_KEY_ROLE } from '../types/auth';
-import { isDeveloperUser } from '../lib/roles';
+import { UserAccount } from '../types/auth';
 
 export interface DashboardViewProps {
   currentUser?: UserAccount | null;
@@ -74,62 +73,6 @@ export function DashboardView({
 
   // Active Tab: 'overview' | 'ledger' | 'intake' | 'sequence' | 'simulator' | 'day22' | 'channels' | 'forecast'
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
-
-  // Strict Developer permission check (zero-DB changes: Email Whitelist / Admin domain)
-  const isDevAllowed = isDeveloperUser(currentUser);
-
-  // Role-based view state ('client' | 'developer')
-  const [userRole, setUserRole] = useState<UserRole>(() => {
-    if (!isDevAllowed) return 'client';
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_ROLE) as UserRole;
-      if (stored === 'client' || stored === 'developer') return stored;
-      return 'developer';
-    } catch {
-      return 'developer';
-    }
-  });
-
-  // Guard: if non-developer somehow has 'developer' role or sequence tab active, reset to 'client' & 'overview'
-  useEffect(() => {
-    if (!isDevAllowed) {
-      if (userRole !== 'client') {
-        setUserRole('client');
-      }
-      if (activeTab === 'sequence') {
-        setActiveTab('overview');
-      }
-      try {
-        localStorage.setItem(STORAGE_KEY_ROLE, 'client');
-      } catch (err) {
-        console.warn('Failed to reset role in localStorage', err);
-      }
-    }
-  }, [isDevAllowed, userRole, activeTab]);
-
-  const handleRoleChange = (newRole: UserRole) => {
-    if (!isDevAllowed) return; // Prevent unauthorized role escalation
-    setUserRole(newRole);
-    try {
-      localStorage.setItem(STORAGE_KEY_ROLE, newRole);
-    } catch (err) {
-      console.warn('Failed to save role to localStorage', err);
-    }
-    if (newRole === 'developer') {
-      setActiveTab('sequence');
-    } else {
-      setActiveTab('overview');
-    }
-  };
-
-  // Keep activeTab aligned with role boundaries (21-Day Engine on dev side, core recovery on client side)
-  useEffect(() => {
-    if (userRole === 'developer' && activeTab !== 'sequence') {
-      setActiveTab('sequence');
-    } else if (userRole === 'client' && activeTab === 'sequence') {
-      setActiveTab('overview');
-    }
-  }, [userRole]);
 
   // Plan Tier simulator (Free, Basic, Growth, Enterprise) — syncs with user account
   const [planTier, setPlanTier] = useState<PlanTier>(
@@ -1179,9 +1122,6 @@ export function DashboardView({
         setSelectedEntity={setSelectedEntity}
         entities={mockBusinessEntities}
         pendingActionsCount={focusItems.length}
-        userRole={userRole}
-        isDevAllowed={isDevAllowed}
-        onRoleChange={isDevAllowed ? handleRoleChange : undefined}
         onOpenCustomerPortal={() => {
           setSelectedInvoiceForPortal(invoices[0]);
           setIsCustomerPortalOpen(true);
@@ -1204,9 +1144,6 @@ export function DashboardView({
           entities={entities}
           pendingActionsCount={focusItems.length}
           currentUser={currentUser}
-          userRole={userRole}
-          isDevAllowed={isDevAllowed}
-          onRoleChange={isDevAllowed ? handleRoleChange : undefined}
           onOpenCustomerPortal={() => {
             setSelectedInvoiceForPortal(invoices[0]);
             setIsCustomerPortalOpen(true);
@@ -1313,11 +1250,12 @@ export function DashboardView({
             </div>
           )}
 
-          {/* VIEW 3: 21-DAY RECOVERY ENGINE (BRD Feature #5) - STRICTLY RESTRICTED TO DEVELOPERS */}
-          {activeTab === 'sequence' && isDevAllowed && (
+          {/* VIEW 3: 21-DAY RECOVERY ENGINE (BRD Feature #5) */}
+          {activeTab === 'sequence' && (
             <div>
               <SequenceEngineBlock
                 planTier={planTier}
+                currentUser={currentUser}
                 onUpgradePrompt={handleUpgradePrompt}
               />
             </div>

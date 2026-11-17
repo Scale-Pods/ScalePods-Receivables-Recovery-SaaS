@@ -775,17 +775,8 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {onOpenTopUp && (
-              <button
-                type="button"
-                onClick={onOpenTopUp}
-                className="px-2.5 py-1 rounded-lg bg-purple-600/15 hover:bg-purple-600/25 text-purple-700 dark:text-purple-300 font-bold border border-purple-500/30 transition-colors cursor-pointer"
-              >
-                + Top Up Slots
-              </button>
-            )}
-            {quota.isInvoiceLimitReached && onUpgradePrompt && (
+          {quota.isInvoiceLimitReached && onUpgradePrompt && (
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => onUpgradePrompt(planTier === 'free' ? 'basic' : 'growth')}
@@ -793,8 +784,8 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
               >
                 Upgrade Plan
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 

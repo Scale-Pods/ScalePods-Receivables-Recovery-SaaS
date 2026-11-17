@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   CheckCircle2,
   Activity,
-  Zap,
   ArrowRight
 } from 'lucide-react';
 import { PlanTier } from '../types/dashboard';
@@ -89,22 +88,9 @@ export const PlanSettingsModal: React.FC<PlanSettingsModalProps> = ({
               <div>
                 <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-1">Monthly Recovery Resource Quotas</h4>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Track invoice enrollment limits, voice call minutes, and top-up reserves for your active tier.
+                  Track invoice enrollment limits, voice call minutes, and automated touches for your active tier.
                 </p>
               </div>
-
-              {onOpenTopUp && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    onOpenTopUp();
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors shadow-xs cursor-pointer"
-                >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>+ Top Up Capacity</span>
-                </button>
-              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

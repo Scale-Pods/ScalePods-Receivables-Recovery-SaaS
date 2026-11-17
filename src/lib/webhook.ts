@@ -73,6 +73,7 @@ export interface InvoiceExtractionWebhookPayload {
 
 const DEFAULT_WEBHOOK_URL = 'https://n8n.srv1711190.hstgr.cloud/webhook/a9ba9cc7-ece8-4fb8-b9a5-be6089e426fe';
 const DEFAULT_INVOICE_EXTRACTION_WEBHOOK_URL = 'https://n8n.srv1711190.hstgr.cloud/webhook/35525ae3-330b-4347-a870-2b5da1de70f8';
+const DEFAULT_SEQUENCE_WEBHOOK_URL = 'https://n8n.srv1711190.hstgr.cloud/webhook/046cf1c5-9a4b-4b36-a427-0100dd11d797';
 
 /**
  * Creates a Razorpay Order via the server-side n8n webhook.
@@ -438,4 +439,99 @@ export async function uploadInvoiceToN8nForExtraction(
     dueDate: null,
     isN8nSuccess: false,
   };
+}
+
+export interface SequenceStepWebhookData {
+  id: string;
+  day: number;
+  stage: string;
+  tone: string;
+  channels: ('email' | 'whatsapp' | 'voice')[];
+  headline: string;
+  triggerRules: string[];
+}
+
+export interface SequenceCustomizationWebhookPayload {
+  userId: string;
+  userEmail?: string;
+  userName?: string;
+  userCompany?: string;
+  planTier?: string;
+  billingCycle?: string;
+  invoiceLimit?: number;
+  voiceMinutesLimit?: number;
+  totalDays: number;
+  stepsCount: number;
+  sequence: SequenceStepWebhookData[];
+  status?: string;
+  timestamp?: string;
+}
+
+/**
+ * Webhook Dispatcher for Custom Cadence / Sequence Configurations
+ * Dispatches customized recovery cadence details and user tier details to the automation webhook.
+ */
+export async function sendSequenceCustomizationWebhook(data: SequenceCustomizationWebhookPayload): Promise<boolean> {
+  const webhookUrl =
+    import.meta.env.VITE_N8N_SEQUENCE_WEBHOOK_URL ||
+    DEFAULT_SEQUENCE_WEBHOOK_URL;
+
+  const tier = (data.planTier || 'free').toLowerCase();
+  const invoiceLimit = data.invoiceLimit ?? (tier === 'enterprise' ? 5000 : tier === 'growth' ? 300 : tier === 'basic' ? 50 : 10);
+  const voiceMinutesLimit = data.voiceMinutesLimit ?? (tier === 'enterprise' ? 600 : tier === 'growth' ? 90 : 0);
+
+  const payload = {
+    event: 'sequence_customization_saved',
+    userId: data.userId,
+    userEmail: data.userEmail || '',
+    userName: data.userName || '',
+    userCompany: data.userCompany || '',
+
+    // User Tier Details
+    userTier: tier,
+    tier: tier,
+    planTier: tier,
+    billingCycle: data.billingCycle || 'monthly',
+    tierDetails: {
+      tier: tier,
+      tierName: tier.toUpperCase(),
+      billingCycle: data.billingCycle || 'monthly',
+      invoiceQuotaLimit: invoiceLimit,
+      voiceMinutesLimit: voiceMinutesLimit,
+      voiceAIAvailable: tier === 'growth' || tier === 'enterprise',
+    },
+
+    // Cadence & Custom Sequence details
+    totalDays: data.totalDays,
+    stepsCount: data.stepsCount,
+    sequence: data.sequence,
+    status: data.status || 'saved',
+    timestamp: data.timestamp || new Date().toISOString(),
+  };
+
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch (err) {
+    try {
+      await fetch(webhookUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload),
+      });
+      return true;
+    } catch (fallbackErr) {
+      console.warn('Sequence webhook delivery notice:', fallbackErr);
+      return false;
+    }
+  }
 }

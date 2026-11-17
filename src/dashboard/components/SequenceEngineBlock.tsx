@@ -5,15 +5,17 @@ import {
   PhoneCall, 
   Plus, 
   Trash2, 
-  Edit3, 
   RotateCcw, 
   Check, 
   Sliders, 
   X, 
-  Clock, 
-  Eye
+  Clock,
+  Save,
+  Loader2
 } from 'lucide-react';
 import { PlanTier } from '../types/dashboard';
+import { UserAccount } from '../../types/auth';
+import { sendSequenceCustomizationWebhook } from '../../lib/webhook';
 
 export interface SequenceDayStep {
   id: string;
@@ -147,18 +149,109 @@ export const default21DaySequence: SequenceDayStep[] = [
 const STORAGE_KEY_CUSTOM_SEQUENCE = 'recovr_custom_sequence';
 const STORAGE_KEY_TOTAL_DAYS = 'recovr_sequence_total_days';
 
+const getDefaultCopyForTone = (tone: SequenceDayStep['tone']): string => {
+  switch (tone) {
+    case 'Friendly':
+      return 'Hi {{customer_name}}, this is a gentle reminder that invoice {{invoice_number}} for ₹{{amount}} is due on {{due_date}}. Please remit via {{razorpay_link}}. Thank you!';
+    case 'Firm':
+      return 'Notice: Invoice {{invoice_number}} for ₹{{amount}} was due on {{due_date}} and remains unsettled. Remit today via {{razorpay_link}}.';
+    case 'Priority':
+      return 'Priority Notice: Invoice {{invoice_number}} (₹{{amount}}) is significantly overdue. Unsettled balance may impact commercial credit terms. Pay now: {{razorpay_link}}';
+    case 'Urgent':
+      return 'URGENT: Invoice {{invoice_number}} (₹{{amount}}) is past due. Daily outreach active. Remit via UPI / NetBanking: {{razorpay_link}}.';
+    case 'Human Review':
+      return 'Autonomous recovery cycle concludes. Invoice moved to internal executive review pending human approval.';
+    default:
+      return 'Payment notice for invoice {{invoice_number}} (₹{{amount}}). Remit via {{razorpay_link}}.';
+  }
+};
+
+const getDefaultVoiceScriptForTone = (tone: SequenceDayStep['tone']): string => {
+  switch (tone) {
+    case 'Friendly':
+      return 'Namaste, this is an automated follow-up regarding invoice {{invoice_number}} for ₹{{amount}}. May I confirm if payment is scheduled?';
+    case 'Firm':
+      return 'Hello, calling regarding overdue invoice {{invoice_number}} for ₹{{amount}}. Please complete settlement via the link sent to your registered contact.';
+    case 'Priority':
+      return 'Namaste, this is the accounts assistant regarding overdue invoice {{invoice_number}} for ₹{{amount}}. May I confirm if payment is being processed today?';
+    case 'Urgent':
+      return 'Urgent escalation notice for invoice {{invoice_number}} with an outstanding balance of ₹{{amount}}. Please remit immediately today.';
+    default:
+      return '';
+  }
+};
+
+const getStageForTone = (tone: SequenceDayStep['tone']): string => {
+  switch (tone) {
+    case 'Friendly':
+      return 'Friendly';
+    case 'Firm':
+      return 'Firm';
+    case 'Priority':
+      return 'Escalation';
+    case 'Urgent':
+      return 'Final Blitz';
+    case 'Human Review':
+      return 'Human Review';
+    default:
+      return 'Friendly';
+  }
+};
+
+const getHeadlineForTone = (tone: SequenceDayStep['tone'], day: number): string => {
+  switch (tone) {
+    case 'Friendly':
+      return `Day ${day}: Friendly Reminder`;
+    case 'Firm':
+      return `Day ${day}: Overdue Notice`;
+    case 'Priority':
+      return `Day ${day}: Priority Escalation`;
+    case 'Urgent':
+      return `Day ${day}: Final Blitz Notice`;
+    case 'Human Review':
+      return `Day ${day}: Human Review Required`;
+    default:
+      return `Day ${day}: Payment Notice`;
+  }
+};
+
 interface SequenceEngineBlockProps {
   planTier: PlanTier;
   onUpgradePrompt: (tier: PlanTier) => void;
+  currentUser?: UserAccount | null;
 }
 
 export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
   planTier,
   onUpgradePrompt,
+  currentUser,
 }) => {
+  // Resolve logged-in user id
+  const loggedInUserId =
+    currentUser?.id ||
+    currentUser?.email ||
+    (() => {
+      try {
+        const stored = localStorage.getItem('recovr_user_account');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          return parsed.id || parsed.email || 'user-client';
+        }
+      } catch {}
+      return 'user-client';
+    })();
+
+  const userSequenceKey = `recovr_custom_sequence_${loggedInUserId}`;
+  const userDaysKey = `recovr_sequence_total_days_${loggedInUserId}`;
+
   // Configurable sequence steps
   const [sequence, setSequence] = useState<SequenceDayStep[]>(() => {
     try {
+      const userStored = localStorage.getItem(userSequenceKey);
+      if (userStored) {
+        const parsed = JSON.parse(userStored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
       const stored = localStorage.getItem(STORAGE_KEY_CUSTOM_SEQUENCE);
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -173,6 +266,8 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
   // Configurable total days
   const [totalDays, setTotalDays] = useState<number>(() => {
     try {
+      const userStored = localStorage.getItem(userDaysKey);
+      if (userStored) return Math.max(1, Number(userStored) || 21);
       const stored = localStorage.getItem(STORAGE_KEY_TOTAL_DAYS);
       if (stored) return Math.max(1, Number(stored) || 21);
     } catch (e) {}
@@ -182,6 +277,11 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
   const [activeStepId, setActiveStepId] = useState<string>(() => {
     return sequence[0]?.id || 'step-1';
   });
+
+  // Save & Sync states
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
 
   // Editor Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -198,7 +298,6 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
   const [formVoiceScript, setFormVoiceScript] = useState<string>('');
   const [formRules, setFormRules] = useState<string[]>([]);
   const [newRuleInput, setNewRuleInput] = useState<string>('');
-  const [showLivePreview, setShowLivePreview] = useState<boolean>(false);
 
   // Active selected step in the inspector
   const activeStep = sequence.find((s) => s.id === activeStepId) || sequence[0] || default21DaySequence[0];
@@ -211,8 +310,65 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
     try {
       localStorage.setItem(STORAGE_KEY_CUSTOM_SEQUENCE, JSON.stringify(sorted));
       localStorage.setItem(STORAGE_KEY_TOTAL_DAYS, String(days));
+      localStorage.setItem(userSequenceKey, JSON.stringify(sorted));
+      localStorage.setItem(userDaysKey, String(days));
     } catch (e) {
       console.warn('Storage save notice', e);
+    }
+  };
+
+  // Save custom sequence and dispatch to webhook with logged-in user id
+  const handleSaveAndSyncSequence = async () => {
+    setIsSaving(true);
+    setSyncStatusMessage(null);
+    setSaveSuccess(false);
+
+    // Save locally
+    persistSequence(sequence, totalDays);
+
+    try {
+      await sendSequenceCustomizationWebhook({
+        userId: loggedInUserId,
+        userEmail: currentUser?.email || '',
+        userName: currentUser?.name || '',
+        userCompany: currentUser?.companyName || '',
+        planTier: planTier,
+        billingCycle: currentUser?.billingCycle || 'monthly',
+        totalDays: totalDays,
+        stepsCount: sequence.length,
+        sequence: sequence.map((s) => ({
+          id: s.id,
+          day: s.day,
+          stage: s.stage,
+          tone: s.tone,
+          channels: s.channels,
+          headline: s.headline,
+          triggerRules: s.triggerRules,
+        })),
+        status: 'active_cadence_saved',
+        timestamp: new Date().toISOString(),
+      });
+
+      setSaveSuccess(true);
+      setSyncStatusMessage('Custom sequence saved and synced to automation webhook.');
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 3500);
+      setTimeout(() => {
+        setSyncStatusMessage(null);
+      }, 6000);
+    } catch (err) {
+      console.warn('Webhook dispatch notification notice:', err);
+      setSaveSuccess(true);
+      setSyncStatusMessage('Sequence saved locally.');
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 3500);
+      setTimeout(() => {
+        setSyncStatusMessage(null);
+      }, 6000);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -221,16 +377,16 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
     setModalMode('create');
     setEditingStepId(null);
     const highestDay = sequence.reduce((max, s) => Math.max(max, s.day), 0);
-    setFormDay(Math.min(totalDays, highestDay > 0 ? highestDay + 1 : 1));
-    setFormStage('Friendly');
+    const nextDay = Math.min(totalDays, highestDay > 0 ? highestDay + 1 : 1);
+    setFormDay(nextDay);
+    setFormStage(getStageForTone('Friendly'));
     setFormTone('Friendly');
     setFormChannels(['email']);
-    setFormHeadline('Payment Reminder Notice');
-    setFormCopy('Hi {{customer_name}}, this is a follow-up regarding invoice {{invoice_number}} for ₹{{amount}}. Please remit via {{razorpay_link}}.');
-    setFormVoiceScript('');
+    setFormHeadline(getHeadlineForTone('Friendly', nextDay));
+    setFormCopy(getDefaultCopyForTone('Friendly'));
+    setFormVoiceScript(getDefaultVoiceScriptForTone('Friendly'));
     setFormRules(['Sent post-grace period', 'Stops on webhook verification']);
     setNewRuleInput('');
-    setShowLivePreview(false);
     setIsModalOpen(true);
   };
 
@@ -247,8 +403,18 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
     setFormVoiceScript(step.voiceScript || '');
     setFormRules([...step.triggerRules]);
     setNewRuleInput('');
-    setShowLivePreview(false);
     setIsModalOpen(true);
+  };
+
+  // Handle tone change
+  const handleToneChange = (tone: SequenceDayStep['tone']) => {
+    setFormTone(tone);
+    setFormStage(getStageForTone(tone));
+    setFormHeadline(getHeadlineForTone(tone, formDay));
+    if (modalMode === 'create') {
+      setFormCopy(getDefaultCopyForTone(tone));
+      setFormVoiceScript(getDefaultVoiceScriptForTone(tone));
+    }
   };
 
   // Channel toggle inside modal
@@ -274,24 +440,24 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
     setFormRules(formRules.filter((_, i) => i !== index));
   };
 
-  // Insert variable into message copy
-  const handleInsertVariable = (variable: string) => {
-    setFormCopy((prev) => `${prev} {{${variable}}}`);
-  };
-
   // Save Step (create or edit)
   const handleSaveStep = (e: React.FormEvent) => {
     e.preventDefault();
+    const stage = formStage.trim() || getStageForTone(formTone);
+    const headline = formHeadline.trim() || getHeadlineForTone(formTone, formDay);
+
     if (modalMode === 'create') {
+      const copy = formCopy.trim() || getDefaultCopyForTone(formTone);
+      const voice = formChannels.includes('voice') ? (formVoiceScript.trim() || getDefaultVoiceScriptForTone(formTone)) : undefined;
       const newStep: SequenceDayStep = {
         id: `step-${Date.now()}`,
         day: Number(formDay),
-        stage: formStage.trim() || 'Friendly',
+        stage: stage,
         tone: formTone,
         channels: formChannels,
-        headline: formHeadline.trim() || 'Payment Notice',
-        copyPreview: formCopy.trim(),
-        voiceScript: formChannels.includes('voice') ? formVoiceScript.trim() : undefined,
+        headline: headline,
+        copyPreview: copy,
+        voiceScript: voice,
         triggerRules: formRules.length > 0 ? formRules : ['Sent post-grace period'],
       };
       const updated = [...sequence, newStep];
@@ -303,12 +469,12 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
           ? {
               ...step,
               day: Number(formDay),
-              stage: formStage.trim() || step.stage,
+              stage: stage,
               tone: formTone,
               channels: formChannels,
-              headline: formHeadline.trim() || step.headline,
-              copyPreview: formCopy.trim(),
-              voiceScript: formChannels.includes('voice') ? formVoiceScript.trim() : undefined,
+              headline: headline,
+              copyPreview: step.copyPreview || getDefaultCopyForTone(formTone),
+              voiceScript: formChannels.includes('voice') ? (step.voiceScript || getDefaultVoiceScriptForTone(formTone)) : undefined,
               triggerRules: formRules,
             }
           : step
@@ -348,32 +514,21 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
     persistSequence(sequence, validDays);
   };
 
-  // Live variable sample render
-  const renderSamplePreview = (text: string) => {
-    return text
-      .replace(/{{customer_name}}/g, 'Nexora Infotech Pvt Ltd')
-      .replace(/{{invoice_number}}/g, 'INV-2024-884')
-      .replace(/{{amount}}/g, '2,40,000')
-      .replace(/{{due_date}}/g, 'Nov 15, 2026')
-      .replace(/{{razorpay_link}}/g, 'https://rzp.io/l/scalepods-recovr')
-      .replace(/{{company_name}}/g, 'ScalePods Inc');
-  };
-
   return (
     <div className="space-y-5">
-      {/* Top Header & Developer Sequence Controls */}
+      {/* Top Header & Sequence Cadence Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">
               Sequence Engine Customizer
             </h2>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 font-semibold uppercase">
-              Developer Mode
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 font-semibold uppercase">
+              Cadence Engine
             </span>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Customize cadence length, configure touchpoint steps, and edit message templates.
+            Customize cadence length, configure touchpoint days, and manage delivery channels.
           </p>
         </div>
 
@@ -431,8 +586,52 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
             <RotateCcw className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Reset Defaults</span>
           </button>
+
+          {/* Save & Sync to Webhook Button */}
+          <button
+            onClick={handleSaveAndSyncSequence}
+            disabled={isSaving}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-all shadow-md cursor-pointer ${
+              saveSuccess
+                ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 ring-2 ring-emerald-500/50'
+                : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30'
+            } ${isSaving ? 'opacity-80 cursor-wait' : ''}`}
+            title="Save custom sequence and dispatch to webhook with logged-in user id"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Saving & Syncing...</span>
+              </>
+            ) : saveSuccess ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Saved & Synced!</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5" />
+                <span>Save Sequence</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Sync Status Banner */}
+      {syncStatusMessage && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-800 dark:text-emerald-300 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span className="font-semibold">{syncStatusMessage}</span>
+          </div>
+          <div className="flex items-center gap-2.5 font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
+            <span>Tier: <strong className="uppercase">{planTier}</strong></span>
+            <span>•</span>
+            <span>User ID: <strong className="underline">{loggedInUserId}</strong></span>
+          </div>
+        </div>
+      )}
 
       {/* Sequence Timeline & Stepper Card */}
       <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] p-5 space-y-4 shadow-sm">
@@ -460,14 +659,18 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
             return (
               <button
                 key={step.id}
-                onClick={() => setActiveStepId(step.id)}
+                onClick={() => {
+                  setActiveStepId(step.id);
+                  handleOpenEditStep(step);
+                }}
                 className={`flex-shrink-0 min-w-[105px] p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                   isCurrent
                     ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-100 shadow-sm ring-1 ring-indigo-500/30'
                     : isFinal
-                    ? 'border-rose-500/30 bg-rose-50/50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-200'
-                    : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700'
+                    ? 'border-rose-500/30 bg-rose-50/50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-200 hover:border-rose-400'
+                    : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 hover:border-indigo-400 dark:hover:border-indigo-500/60'
                 }`}
+                title={`Click to edit Day ${step.day} touchpoint`}
               >
                 <div className="flex items-center justify-between text-[10px] font-mono font-bold mb-1">
                   <span className={isCurrent ? 'text-indigo-600 dark:text-indigo-300' : 'text-zinc-500 dark:text-zinc-400'}>
@@ -481,10 +684,6 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
                 </div>
 
                 <div className="text-xs font-semibold truncate leading-snug">
-                  {step.stage}
-                </div>
-
-                <div className="text-[10px] text-zinc-400 truncate mt-0.5">
                   {step.tone}
                 </div>
               </button>
@@ -505,78 +704,52 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
 
         {/* Selected Step Detail & Inspector Panel */}
         {activeStep && (
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-[#0E0F16] p-5 space-y-4">
-            {/* Header of Inspector */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800/80">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white">
-                  DAY {activeStep.day}
-                </span>
-                <span className="text-sm font-bold text-zinc-900 dark:text-white">
-                  {activeStep.headline}
-                </span>
-                <span className="text-xs text-zinc-400">•</span>
-                <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
-                  Stage: {activeStep.stage}
-                </span>
-                <span className="text-xs text-zinc-400">•</span>
-                <span className="text-xs text-zinc-500 font-mono">
-                  Tone: {activeStep.tone}
-                </span>
+          <div 
+            onClick={() => handleOpenEditStep(activeStep)}
+            className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-[#0E0F16] hover:border-indigo-400 dark:hover:border-indigo-500/50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs cursor-pointer transition-all group"
+            title="Click to edit step details"
+          >
+            {/* Step info */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                DAY {activeStep.day}
+              </span>
+              <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Tone: <span className="font-mono text-indigo-600 dark:text-indigo-400">{activeStep.tone}</span>
+              </span>
+              <span className="text-xs text-zinc-300 dark:text-zinc-700">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-zinc-500 font-medium">Channels:</span>
+                {activeStep.channels.map((ch) => (
+                  <span
+                    key={ch}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 uppercase"
+                  >
+                    {ch === 'email' && <Mail className="w-2.5 h-2.5 text-indigo-500" />}
+                    {ch === 'whatsapp' && <MessageSquare className="w-2.5 h-2.5 text-emerald-500" />}
+                    {ch === 'voice' && <PhoneCall className="w-2.5 h-2.5 text-purple-500" />}
+                    <span>{ch}</span>
+                  </span>
+                ))}
               </div>
-
-              {/* Action Buttons for Step */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditStep(activeStep)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-all cursor-pointer shadow-xs"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Edit Step</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDeleteStep(activeStep.id)}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                  title="Delete Step"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+              <span className="text-[11px] text-zinc-400 dark:text-zinc-500 italic hidden sm:inline ml-1 group-hover:text-indigo-500 transition-colors">
+                (Click to customize)
+              </span>
             </div>
 
-            {/* Template Copy & Preview */}
-            <div className="space-y-3">
-              <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span>Message Copy Template</span>
-                  <div className="flex items-center gap-1">
-                    {activeStep.channels.map((ch) => (
-                      <span key={ch} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 uppercase">
-                        {ch}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-800 dark:text-zinc-200 font-mono leading-relaxed select-text shadow-xs">
-                {activeStep.copyPreview}
-              </div>
-
-              {activeStep.voiceScript && (
-                <div className="p-3.5 rounded-xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/40 text-xs text-zinc-800 dark:text-zinc-200">
-                  <div className="text-[10px] font-mono uppercase text-indigo-600 dark:text-indigo-400 font-bold mb-1 flex items-center gap-1">
-                    <PhoneCall className="w-3 h-3" />
-                    <span>Voice AI Call Dialogue (9:00 AM – 7:00 PM IST):</span>
-                  </div>
-                  <p className="italic font-serif leading-relaxed text-zinc-700 dark:text-zinc-300">
-                    "{activeStep.voiceScript}"
-                  </p>
-                </div>
-              )}
+            {/* Action Buttons for Step */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteStep(activeStep.id);
+                }}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                title="Delete Step"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
@@ -602,7 +775,7 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
                     {modalMode === 'create' ? 'Add Sequence Step' : `Edit Step — Day ${formDay}`}
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Configure schedule timing, channels, and message copy.
+                    Configure schedule timing, tone, and delivery channels.
                   </p>
                 </div>
               </div>
@@ -618,8 +791,8 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
 
             {/* Modal Form */}
             <form onSubmit={handleSaveStep} className="space-y-4">
-              {/* Row 1: Day Number, Stage, Tone */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Row 1: Day Number & Tone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Day Number */}
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
@@ -631,37 +804,25 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
                     max="90"
                     required
                     value={formDay}
-                    onChange={(e) => setFormDay(Number(e.target.value))}
+                    onChange={(e) => {
+                      const d = Number(e.target.value);
+                      setFormDay(d);
+                      if (modalMode === 'create') {
+                        setFormHeadline(getHeadlineForTone(formTone, d));
+                      }
+                    }}
                     className="w-full px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
                   />
-                </div>
-
-                {/* Stage */}
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Stage Name
-                  </label>
-                  <select
-                    value={formStage}
-                    onChange={(e) => setFormStage(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="Friendly">Friendly</option>
-                    <option value="Firm">Firm</option>
-                    <option value="Escalation">Escalation</option>
-                    <option value="Final Blitz">Final Blitz</option>
-                    <option value="Human Review">Human Review</option>
-                  </select>
                 </div>
 
                 {/* Tone */}
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Tone
+                    Tone / Urgency
                   </label>
                   <select
                     value={formTone}
-                    onChange={(e) => setFormTone(e.target.value as SequenceDayStep['tone'])}
+                    onChange={(e) => handleToneChange(e.target.value as SequenceDayStep['tone'])}
                     className="w-full px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
                   >
                     <option value="Friendly">Friendly</option>
@@ -719,90 +880,6 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
                   </button>
                 </div>
               </div>
-
-              {/* Row 3: Headline / Subject */}
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                  Subject / Touchpoint Headline <span className="text-indigo-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Payment Reminder Notice & UPI Link"
-                  value={formHeadline}
-                  onChange={(e) => setFormHeadline(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              {/* Row 4: Message Template Copy with Variable Chips */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                    Message Template Copy <span className="text-indigo-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowLivePreview(!showLivePreview)}
-                    className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>{showLivePreview ? 'Edit Template' : 'Live Sample Preview'}</span>
-                  </button>
-                </div>
-
-                {showLivePreview ? (
-                  <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-indigo-500/30 text-xs text-zinc-800 dark:text-zinc-200 font-mono leading-relaxed min-h-[90px]">
-                    {renderSamplePreview(formCopy)}
-                  </div>
-                ) : (
-                  <textarea
-                    rows={4}
-                    required
-                    value={formCopy}
-                    onChange={(e) => setFormCopy(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed"
-                  />
-                )}
-
-                {/* Variable Pills */}
-                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-zinc-400 font-medium">Insert variable:</span>
-                  {[
-                    'customer_name',
-                    'invoice_number',
-                    'amount',
-                    'due_date',
-                    'razorpay_link',
-                    'company_name',
-                  ].map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => handleInsertVariable(v)}
-                      className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-zinc-100 dark:bg-zinc-800 text-indigo-600 dark:text-indigo-300 border border-zinc-200 dark:border-zinc-700 hover:border-indigo-400 transition-colors cursor-pointer"
-                    >
-                      +{`{{${v}}}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Row 5: Voice AI Script (if Voice is selected) */}
-              {formChannels.includes('voice') && (
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Voice AI Caller Dialogue Script
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="Enter dialogue script for the automated voice agent..."
-                    value={formVoiceScript}
-                    onChange={(e) => setFormVoiceScript(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-serif italic text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed"
-                  />
-                </div>
-              )}
 
               {/* Footer Actions */}
               <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">

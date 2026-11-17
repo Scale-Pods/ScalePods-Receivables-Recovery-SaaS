@@ -6,14 +6,11 @@ import {
   TrendingUp,
   CheckCircle2,
   Sparkles,
-  LogOut,
-  User,
-  Code2
+  LogOut
 } from 'lucide-react';
 import { PlanTier, BusinessEntity } from '../types/dashboard';
 import { ActiveTab } from './Sidebar';
-import { UserAccount, UserRole } from '../../types/auth';
-import { isDeveloperUser } from '../../lib/roles';
+import { UserAccount } from '../../types/auth';
 
 interface TopNavbarProps {
   activeTab: ActiveTab;
@@ -24,9 +21,6 @@ interface TopNavbarProps {
   entities?: BusinessEntity[];
   pendingActionsCount?: number;
   currentUser?: UserAccount | null;
-  userRole?: UserRole;
-  isDevAllowed?: boolean;
-  onRoleChange?: (role: UserRole) => void;
   onOpenCustomerPortal?: () => void;
   onOpenPlanSettings?: () => void;
   onSwitchToLanding?: () => void;
@@ -37,9 +31,6 @@ interface TopNavbarProps {
 export const TopNavbar: React.FC<TopNavbarProps> = ({
   activeTab,
   currentUser,
-  userRole = 'client',
-  isDevAllowed,
-  onRoleChange,
   onOpenUpgrade,
   onOpenPlanSettings,
   onSignOut,
@@ -77,40 +68,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         </h1>
       </div>
 
-      {/* Right Controls: Role Switcher, Upgrade and Sign Out */}
+      {/* Right Controls: Upgrade and Sign Out */}
       <div className="flex items-center gap-2 sm:gap-3">
-        
-        {/* Clean Segmented Role Switcher (Client vs Developer) - ONLY VISIBLE TO APPROVED DEVELOPERS */}
-        {(isDevAllowed ?? isDeveloperUser(currentUser)) && onRoleChange && (
-          <div className="inline-flex items-center p-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => onRoleChange('client')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${
-                userRole === 'client'
-                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
-                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
-              }`}
-              title="Client View"
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Client</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onRoleChange('developer')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${
-                userRole === 'developer'
-                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
-                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
-              }`}
-              title="Developer View"
-            >
-              <Code2 className="w-3.5 h-3.5" />
-              <span>Developer</span>
-            </button>
-          </div>
-        )}
 
         {/* Upgrade Button */}
         <button

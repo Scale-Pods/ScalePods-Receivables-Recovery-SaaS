@@ -10,11 +10,9 @@ import {
   Plus, 
   Moon, 
   Sun, 
-  CheckCircle2,
-  Zap
+  CheckCircle2
 } from 'lucide-react';
 import { PlanTier, BusinessEntity } from '../types/dashboard';
-import { UserRole } from '../../types/auth';
 import { QuotaUsage } from '../utils/quota';
 
 export type ActiveTab = 
@@ -36,9 +34,6 @@ interface SidebarProps {
   setSelectedEntity: (entity: BusinessEntity) => void;
   entities: BusinessEntity[];
   pendingActionsCount: number;
-  userRole?: UserRole;
-  isDevAllowed?: boolean;
-  onRoleChange?: (role: UserRole) => void;
   onOpenCustomerPortal: () => void;
   onOpenPlanSettings: () => void;
   quota?: QuotaUsage;
@@ -52,8 +47,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isDark,
   setIsDark,
   pendingActionsCount,
-  userRole = 'client',
-  isDevAllowed = false,
   onOpenCustomerPortal,
   onOpenPlanSettings,
   quota,
@@ -76,16 +69,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const navItems = userRole === 'developer'
-    ? [
-        { id: 'sequence' as ActiveTab, label: '21-Day Engine', icon: Cpu },
-      ]
-    : [
-        { id: 'overview' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'focus' as ActiveTab, label: 'Approvals', icon: CheckCircle2, badge: pendingActionsCount > 0 ? pendingActionsCount : undefined },
-        { id: 'intake' as ActiveTab, label: 'Intake', icon: UploadCloud },
-        { id: 'forecast' as ActiveTab, label: 'Cash Forecast', icon: TrendingUp },
-      ];
+  const navItems = [
+    { id: 'overview' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'focus' as ActiveTab, label: 'Approvals', icon: CheckCircle2, badge: pendingActionsCount > 0 ? pendingActionsCount : undefined },
+    { id: 'intake' as ActiveTab, label: 'Intake', icon: UploadCloud },
+    { id: 'sequence' as ActiveTab, label: '21-Day Sequence', icon: Cpu },
+    { id: 'forecast' as ActiveTab, label: 'Cash Forecast', icon: TrendingUp },
+  ];
 
   return (
     <aside 
@@ -100,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {!isCollapsed ? (
           <>
             <div 
-              onClick={() => setActiveTab(userRole === 'developer' ? 'sequence' : 'overview')}
+              onClick={() => setActiveTab('overview')}
               className="flex items-center cursor-pointer select-none"
             >
               <img
@@ -122,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           <div className="w-full flex items-center justify-between">
             <button
-              onClick={() => setActiveTab(userRole === 'developer' ? 'sequence' : 'overview')}
+              onClick={() => setActiveTab('overview')}
               className="w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs font-mono text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0 border border-zinc-200 dark:border-zinc-800"
               title="ScalePods Dashboard"
               aria-label="ScalePods Dashboard"
@@ -142,31 +132,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* Role Indicator - Only visible to developers who have access to both modes */}
-      {isDevAllowed && !isCollapsed && (
-        <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-          <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-medium">Mode</span>
-          <span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 font-mono capitalize px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/60">
-            {userRole === 'developer' ? 'Developer' : 'Client'}
-          </span>
-        </div>
-      )}
-
-      {/* Quick Action - Client View Only */}
-      {userRole !== 'developer' && (
-        <div className="p-3 border-b border-zinc-200 dark:border-zinc-800/60">
-          <button
-            onClick={() => setActiveTab('intake')}
-            className={`w-full py-2 px-3.5 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
-              isCollapsed ? 'px-1' : ''
-            }`}
-            title="Add Invoice"
-          >
-            <Plus className="w-4 h-4 flex-shrink-0" />
-            {!isCollapsed && <span>Add Invoice</span>}
-          </button>
-        </div>
-      )}
+      {/* Quick Action */}
+      <div className="p-3 border-b border-zinc-200 dark:border-zinc-800/60">
+        <button
+          onClick={() => setActiveTab('intake')}
+          className={`w-full py-2 px-3.5 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
+            isCollapsed ? 'px-1' : ''
+          }`}
+          title="Add Invoice"
+        >
+          <Plus className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && <span>Add Invoice</span>}
+        </button>
+      </div>
 
       {/* Nav List */}
       <nav className="flex-1 px-2.5 py-3 space-y-1.5 overflow-y-auto">
@@ -209,16 +187,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-[11px] text-zinc-500 dark:text-zinc-400">Monthly Quota</span>
-              {onOpenTopUp && (
-                <button
-                  onClick={onOpenTopUp}
-                  className="text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5 cursor-pointer"
-                  title="Top-up quota"
-                >
-                  <Zap className="w-2.5 h-2.5" />
-                  <span>Top Up</span>
-                </button>
-              )}
             </div>
 
             {/* Invoices Meter */}

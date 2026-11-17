@@ -130,8 +130,14 @@ export async function signUpUser(params: {
         : null;
       const assignedRole: UserRole = rawRole === 'developer' ? 'developer' : 'client';
 
+      const customerUid = (createdRow.customer_uid ?? createdRow.uid)
+        ? String(createdRow.customer_uid ?? createdRow.uid)
+        : String(createdRow.id);
+
       const account: UserAccount = {
         id: String(createdRow.id),
+        customer_uid: customerUid,
+        uid: customerUid,
         email: createdRow.Email || normalizedEmail,
         name: createdRow.Name || fullName,
         companyName: createdRow.companyName || companyName,
@@ -229,8 +235,14 @@ export async function signInUser(params: {
         : null;
       const assignedRole: UserRole = rawRole === 'developer' ? 'developer' : 'client';
 
+      const customerUid = (userRow.customer_uid ?? userRow.uid)
+        ? String(userRow.customer_uid ?? userRow.uid)
+        : String(userRow.id);
+
       const account: UserAccount = {
         id: String(userRow.id),
+        customer_uid: customerUid,
+        uid: customerUid,
         email: userRow.Email || normalizedEmail,
         name: userRow.Name || 'Admin',
         companyName: userRow.companyName || 'My Enterprise',
@@ -272,6 +284,8 @@ export async function signInUser(params: {
 
     const account: UserAccount = {
       id: userRecord.id,
+      customer_uid: userRecord.customer_uid || userRecord.uid || userRecord.id,
+      uid: userRecord.uid || userRecord.customer_uid || userRecord.id,
       email: userRecord.email,
       name: userRecord.name,
       companyName: userRecord.companyName,
@@ -323,10 +337,10 @@ export async function updatePlanTierInSupabase(
           Tier: newTier,
         });
 
-      if (!isNaN(numericId)) {
+      if (!isNaN(numericId) && numericId > 0 && String(numericId) === String(userId)) {
         await query.eq('id', numericId);
       } else {
-        await query.eq('id', userId);
+        await query.or(`uid.eq.${userId},id.eq.${userId}`);
       }
     } catch (e) {
       console.warn('Failed to update Tier in Credentials table:', e);

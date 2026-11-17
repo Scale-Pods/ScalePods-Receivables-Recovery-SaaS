@@ -282,9 +282,9 @@ export function recoveryRowToInvoice(row: any): Invoice {
 export function invoiceToRecoveryRow(
   inv: Invoice, 
   extraProps: Record<string, any> = {},
-  user?: { id?: string; email?: string; name?: string; companyName?: string }
+  user?: { id?: string; customer_uid?: string; email?: string; name?: string; companyName?: string }
 ): Record<string, any> {
-  const clientUid = user?.id || extraProps.customer_uid || null;
+  const clientUid = user?.customer_uid || user?.id || extraProps.customer_uid || null;
   const clientEmail = (user?.email || extraProps.customer_email || '').toLowerCase().trim() || null;
   const clientName = user?.companyName || user?.name || extraProps.customer_name || null;
 
@@ -663,12 +663,17 @@ export async function saveInvoiceInDb(
         overdue_amount: String(invoice.amount),
         updated_at: new Date().toISOString(),
       };
+      if (safeUserId !== 'local_user') {
+        updateData.customer_uid = safeUserId;
+      }
 
       if (!isNaN(Number(invoice.id))) {
         await supabase.from(targetTable).update(updateData).eq('id', Number(invoice.id));
       } else {
         let q = supabase.from(targetTable).update(updateData).eq('bill_no', invoice.invoiceNumber);
-        if (normalizedEmail) {
+        if (safeUserId !== 'local_user') {
+          q = q.eq('customer_uid', safeUserId);
+        } else if (normalizedEmail) {
           q = q.ilike('customer_email', normalizedEmail);
         }
         await q;

@@ -404,8 +404,9 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
         fileSizeBytes: selectedFile?.size,
         debtorEmail: uploadEmail.trim(),
         debtorPhone: uploadPhone.trim(),
-        userId: currentUser?.id,
-        clientId: currentUser?.id,
+        customer_uid: currentUser?.customer_uid || currentUser?.uid,
+        userId: currentUser?.customer_uid || currentUser?.id,
+        clientId: currentUser?.customer_uid || currentUser?.id,
         userEmail: effectiveUserEmail,
         userTier: effectiveUserTier,
         userName: effectiveUserName,
@@ -523,6 +524,9 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
 
     // Also dispatch enrolled invoice notification with any edited adjustments
     sendInvoiceExtractionWebhook({
+      customer_uid: currentUser?.customer_uid || currentUser?.uid,
+      userId: currentUser?.customer_uid || currentUser?.id,
+      clientId: currentUser?.customer_uid || currentUser?.id,
       invoiceNumber: scannedResult.invoiceNumber,
       customerCompany: scannedResult.customerCompany,
       customerName: scannedResult.customerName,

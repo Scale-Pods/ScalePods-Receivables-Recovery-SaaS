@@ -226,8 +226,23 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
   onUpgradePrompt,
   currentUser,
 }) => {
-  // Resolve logged-in user id
+  // Resolve logged-in user id & customer_uid
+  const loggedInCustomerUid =
+    currentUser?.customer_uid ||
+    currentUser?.uid ||
+    (() => {
+      try {
+        const stored = localStorage.getItem('recovr_user_account');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          return parsed.customer_uid || parsed.uid;
+        }
+      } catch {}
+      return undefined;
+    })();
+
   const loggedInUserId =
+    loggedInCustomerUid ||
     currentUser?.id ||
     currentUser?.email ||
     (() => {
@@ -329,6 +344,8 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
     try {
       await sendSequenceCustomizationWebhook({
         userId: loggedInUserId,
+        customer_uid: loggedInCustomerUid || loggedInUserId,
+        customerUid: loggedInCustomerUid || loggedInUserId,
         userEmail: currentUser?.email || '',
         userName: currentUser?.name || '',
         userCompany: currentUser?.companyName || '',
@@ -628,7 +645,7 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
           <div className="flex items-center gap-2.5 font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
             <span>Tier: <strong className="uppercase">{planTier}</strong></span>
             <span>•</span>
-            <span>User ID: <strong className="underline">{loggedInUserId}</strong></span>
+            <span>Customer UID: <strong className="underline">{loggedInCustomerUid || loggedInUserId}</strong></span>
           </div>
         </div>
       )}

@@ -11,7 +11,7 @@ import { TierPurchaseModal } from './components/TierPurchaseModal';
 import { UserAccount, PlanTierType, STORAGE_KEY_USER } from './types/auth';
 import { PricingPlan, pricingPlans } from './data/landingData';
 import { DashboardView } from './dashboard/App';
-import { signOutUser, updatePlanTierInSupabase } from './lib/supabase';
+import { signOutUser, updatePlanTierInSupabase, isSupabaseConfigured, supabase } from './lib/supabase';
 
 export function App() {
   // Navigation View: 'landing' (marketing site) | 'dashboard' (Recovery SaaS core system)
@@ -34,6 +34,34 @@ export function App() {
       if (stored) {
         const parsed: UserAccount = JSON.parse(stored);
         setCurrentUser(parsed);
+
+        // Auto-upgrade session with customer_uid from Credentials if missing
+        if (!parsed.customer_uid && parsed.email && isSupabaseConfigured && supabase) {
+          (async () => {
+            try {
+              const { data } = await supabase
+                .from('Credentials')
+                .select('uid, id')
+                .ilike('Email', parsed.email.trim().toLowerCase())
+                .maybeSingle();
+
+              if (data && (data.uid || data.id)) {
+                const uidVal = String(data.uid || data.id);
+                const upgraded: UserAccount = {
+                  ...parsed,
+                  customer_uid: uidVal,
+                  uid: uidVal,
+                };
+                setCurrentUser(upgraded);
+                try {
+                  localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(upgraded));
+                } catch {}
+              }
+            } catch (upgradeErr) {
+              console.warn('Session upgrade notice:', upgradeErr);
+            }
+          })();
+        }
       }
     } catch (err) {
       console.warn('Failed to parse stored user', err);

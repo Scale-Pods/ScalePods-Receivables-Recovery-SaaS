@@ -3,6 +3,8 @@ export type UserRole = 'client' | 'developer';
 
 export interface UserAccount {
   id?: string;
+  customer_uid?: string;
+  uid?: string;
   name: string;
   email: string;
   companyName: string;

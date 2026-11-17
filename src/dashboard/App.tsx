@@ -132,7 +132,7 @@ export function DashboardView({
     async function initDb() {
       setIsDbLoading(true);
       try {
-        const userId = currentUser?.id || 'local_user';
+        const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
         const userEmail = currentUser?.email;
         const res = await loadDashboardData(userId, planTier, userEmail);
         if (isMounted) {
@@ -182,7 +182,7 @@ export function DashboardView({
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.id, currentUser?.email, planTier]);
+  }, [currentUser?.customer_uid, currentUser?.id, currentUser?.email, planTier]);
 
   // Modals & Drawer states
   const [selectedInvoiceForTimeline, setSelectedInvoiceForTimeline] = useState<Invoice | null>(null);
@@ -387,7 +387,7 @@ export function DashboardView({
     setFocusItems(remainingFocus);
 
     // Persist Payment, Invoice & Customer to Database
-    const userId = currentUser?.id || 'local_user';
+    const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
     const userEmail = currentUser?.email;
     recordPaymentInDb(userId, paymentRecord, updatedInv, updatedCust, planTier, userEmail);
     syncFocusItemsInDb(userId, remainingFocus, planTier, userEmail);
@@ -440,7 +440,7 @@ export function DashboardView({
           return inv;
         })
       );
-      const userId = currentUser?.id || 'local_user';
+      const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
       saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
       addToast('info', 'Outreach Resumed', `Active dunning resumed for ${invoice.customerCompany}.`);
     } else {
@@ -472,7 +472,7 @@ export function DashboardView({
         return inv;
       })
     );
-    const userId = currentUser?.id || 'local_user';
+    const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
     saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
     setSelectedInvoiceForPause(null);
     addToast('warning', `Outreach Paused (${duration})`, `${invoice.customerCompany}: ${reason}`);
@@ -508,7 +508,7 @@ export function DashboardView({
         return inv;
       })
     );
-    const userId = currentUser?.id || 'local_user';
+    const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
     saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
     addToast('success', 'Nudge Dispatched', `Urgent notice sent to ${invoice.customerName}.`);
   };
@@ -550,7 +550,7 @@ export function DashboardView({
         return inv;
       })
     );
-    const userId = currentUser?.id || 'local_user';
+    const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
     saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
     setSelectedInvoiceForBucket(null);
     addToast('info', 'Bucket Reassigned', `Invoice #${invoice.invoiceNumber} moved to ${newBucket.toUpperCase()}.`);
@@ -589,7 +589,7 @@ export function DashboardView({
     const remainingFocus = focusItems.filter((item) => item.invoiceId !== invoice.invoiceNumber);
     setFocusItems(remainingFocus);
 
-    const userId = currentUser?.id || 'local_user';
+    const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
     saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
     syncFocusItemsInDb(userId, remainingFocus, planTier, currentUser?.email);
 
@@ -625,7 +625,7 @@ export function DashboardView({
     const remainingFocus = focusItems.filter((item) => item.invoiceId !== invoice.invoiceNumber);
     setFocusItems(remainingFocus);
 
-    const userId = currentUser?.id || 'local_user';
+    const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
     saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
     syncFocusItemsInDb(userId, remainingFocus, planTier, currentUser?.email);
 
@@ -690,7 +690,7 @@ export function DashboardView({
               ...inv.timeline,
             ],
           };
-          const userId = currentUser?.id || 'local_user';
+          const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
           saveInvoiceInDb(userId, invUpdated, planTier, currentUser?.email);
           return invUpdated;
         }
@@ -698,7 +698,7 @@ export function DashboardView({
       })
     );
 
-    const userId = currentUser?.id || 'local_user';
+    const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
     if (updatedCust) {
       saveCustomerInDb(userId, updatedCust, planTier, currentUser?.email);
     }
@@ -930,7 +930,7 @@ export function DashboardView({
     }
 
     // Persist new invoice to Database
-    const userId = currentUser?.id || 'local_user';
+    const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
     addInvoiceToDb(
       userId, 
       fullInvoice, 
@@ -993,7 +993,7 @@ export function DashboardView({
       };
       setPayments((prev) => [partPayment, ...prev]);
 
-      const userId = currentUser?.id || 'local_user';
+      const userId = currentUser?.customer_uid || currentUser?.id || 'local_user';
       saveInvoiceInDb(userId, updatedInv, planTier, currentUser?.email);
       recordPaymentInDb(userId, partPayment, updatedInv, undefined, planTier, currentUser?.email);
 

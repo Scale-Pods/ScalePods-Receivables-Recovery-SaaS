@@ -63,6 +63,10 @@ export interface InvoiceExtractionWebhookPayload {
   fileSize?: string | null;
 
   // Active User Account Context
+  customer_uid?: string;
+  customerUid?: string;
+  userId?: string;
+  clientId?: string;
   userEmail: string;
   userTier: string;
   userName?: string;
@@ -249,8 +253,14 @@ export async function sendInvoiceExtractionWebhook(data: InvoiceExtractionWebhoo
     import.meta.env.VITE_N8N_INVOICE_WEBHOOK_URL ||
     DEFAULT_INVOICE_EXTRACTION_WEBHOOK_URL;
 
+  const resolvedUid = data.customer_uid || data.customerUid || data.userId || data.clientId || '';
+
   const payload = {
     // User Context
+    customer_uid: resolvedUid,
+    customerUid: resolvedUid,
+    userId: data.userId || resolvedUid,
+    clientId: data.clientId || resolvedUid,
     userEmail: data.userEmail || '',
     userTier: data.userTier || 'free',
     userName: data.userName || '',
@@ -309,6 +319,8 @@ export interface InvoiceUploadExtractionRequest {
   fileSizeBytes?: number;
   debtorEmail: string;
   debtorPhone: string;
+  customer_uid?: string;
+  customerUid?: string;
   userId?: string;
   clientId?: string;
   userEmail: string;
@@ -375,10 +387,12 @@ export async function uploadInvoiceToN8nForExtraction(
   }
 
   // 5. Active Subscriber Context
-  const clientId = data.clientId || data.userId || '';
-  if (clientId) {
-    formData.append('clientId', clientId);
-    formData.append('userId', clientId);
+  const resolvedUid = data.customer_uid || data.customerUid || data.clientId || data.userId || '';
+  if (resolvedUid) {
+    formData.append('customer_uid', resolvedUid);
+    formData.append('customerUid', resolvedUid);
+    formData.append('clientId', resolvedUid);
+    formData.append('userId', resolvedUid);
   }
   formData.append('userEmail', data.userEmail || '');
   formData.append('userTier', data.userTier || 'free');
@@ -482,6 +496,8 @@ export interface SequenceStepWebhookData {
 
 export interface SequenceCustomizationWebhookPayload {
   userId: string;
+  customer_uid?: string;
+  customerUid?: string;
   userEmail?: string;
   userName?: string;
   userCompany?: string;
@@ -509,9 +525,13 @@ export async function sendSequenceCustomizationWebhook(data: SequenceCustomizati
   const invoiceLimit = data.invoiceLimit ?? (tier === 'enterprise' ? 5000 : tier === 'growth' ? 300 : tier === 'basic' ? 50 : 10);
   const voiceMinutesLimit = data.voiceMinutesLimit ?? (tier === 'enterprise' ? 600 : tier === 'growth' ? 90 : 0);
 
+  const resolvedUid = data.customer_uid || data.customerUid || data.userId;
+
   const payload = {
     event: 'sequence_customization_saved',
-    userId: data.userId,
+    customer_uid: resolvedUid,
+    customerUid: resolvedUid,
+    userId: data.userId || resolvedUid,
     userEmail: data.userEmail || '',
     userName: data.userName || '',
     userCompany: data.userCompany || '',

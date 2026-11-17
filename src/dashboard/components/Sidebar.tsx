@@ -5,7 +5,6 @@ import {
   Cpu, 
   TrendingUp, 
   CreditCard, 
-  SlidersHorizontal, 
   ChevronLeft, 
   ChevronRight, 
   Plus, 
@@ -259,15 +258,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ) : null}
           </div>
         )}
-
-        <button
-          onClick={onOpenPlanSettings}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
-          title="Usage & Details"
-        >
-          <SlidersHorizontal className="w-[18px] h-[18px] flex-shrink-0" />
-          {!isCollapsed && <span>Usage & Details</span>}
-        </button>
 
         {!isCollapsed ? (
           <div className="pt-2.5 border-t border-zinc-200 dark:border-zinc-800/60 flex items-center justify-between px-1.5">

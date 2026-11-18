@@ -23,11 +23,11 @@ export const CustomerRiskExplainerModal: React.FC<CustomerRiskExplainerModalProp
 
   return (
     <div 
-      className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-4xl lg:max-w-5xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111218] shadow-2xl overflow-hidden p-4 sm:p-5 text-zinc-900 dark:text-white"
+        className="relative w-full max-w-4xl lg:max-w-5xl max-h-[92vh] overflow-y-auto rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111218] shadow-2xl p-4 sm:p-5 text-zinc-900 dark:text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - Horizontal Compact Bar */}

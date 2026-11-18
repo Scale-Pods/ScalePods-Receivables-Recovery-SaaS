@@ -46,7 +46,7 @@ export const ThreeQuestionsBar: React.FC<ThreeQuestionsBarProps> = ({
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex items-center justify-between gap-2 text-xs">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
             {/* Overdue */}
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-zinc-800/50 border border-slate-200/70 dark:border-zinc-700/60 text-zinc-600 dark:text-zinc-300">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />

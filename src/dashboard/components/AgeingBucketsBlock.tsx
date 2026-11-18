@@ -73,10 +73,10 @@ export const AgeingBucketsBlock: React.FC<AgeingBucketsBlockProps> = ({
             <div
               key={bucket.id}
               onClick={() => onSelectBucket(isSelected ? 'all' : bucket.id)}
-              className={`rounded-xl border p-4 cursor-pointer transition-all ${
+              className={`rounded-2xl border p-4 cursor-pointer transition-all ${
                 isSelected
-                  ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800/80 shadow-sm'
-                  : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-card-light dark:shadow-card-dark'
+                  ? 'border-purple-600 dark:border-white bg-purple-50/60 dark:bg-zinc-800/80 shadow-md ring-1 ring-purple-500/30'
+                  : 'border-slate-200/90 dark:border-zinc-800 bg-gradient-to-b from-white to-slate-50/50 dark:from-zinc-900/60 dark:to-zinc-900/60 hover:border-purple-300 dark:hover:border-zinc-700 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_16px_rgba(0,0,0,0.02)] dark:shadow-card-dark hover:shadow-md'
               }`}
             >
               <div className="flex items-center justify-between text-xs mb-1">

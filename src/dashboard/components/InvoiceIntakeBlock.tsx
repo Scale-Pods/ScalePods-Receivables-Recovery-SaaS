@@ -696,12 +696,12 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs">
+        <div className="flex items-center bg-slate-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-slate-200 dark:border-zinc-800 text-xs">
           <button
             onClick={() => setActiveTab('smart_upload')}
             className={`px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer ${
               activeTab === 'smart_upload'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold shadow-sm border border-zinc-200/80 dark:border-zinc-700/80'
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold shadow-xs border border-slate-200/80 dark:border-zinc-700/80'
                 : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
@@ -711,7 +711,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
             onClick={() => setActiveTab('manual_form')}
             className={`px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer ${
               activeTab === 'manual_form'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold shadow-sm border border-zinc-200/80 dark:border-zinc-700/80'
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold shadow-xs border border-slate-200/80 dark:border-zinc-700/80'
                 : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
@@ -721,12 +721,12 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
             onClick={() => setActiveTab('connectors')}
             className={`px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'connectors'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold shadow-sm border border-zinc-200/80 dark:border-zinc-700/80'
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold shadow-xs border border-slate-200/80 dark:border-zinc-700/80'
                 : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
             <span>Connectors</span>
-            <span className="text-[10px] font-mono px-1 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+            <span className="text-[10px] font-mono px-1 rounded bg-slate-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
               {planTier === 'free' ? 'Basic+' : '6'}
             </span>
           </button>
@@ -786,7 +786,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Upload Form: Email, Phone & Invoice File */}
           <div className="lg:col-span-6 space-y-4">
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] p-5 space-y-4 shadow-sm">
+            <div className="rounded-xl border border-slate-200/90 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] p-5 space-y-4 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_8px_24px_rgba(124,58,237,0.03)]">
               <div>
                 <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Smart Invoice Intake</h3>
               </div>

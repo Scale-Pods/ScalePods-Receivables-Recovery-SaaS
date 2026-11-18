@@ -7,7 +7,6 @@ import {
   AlertTriangle, 
   Lock, 
   RefreshCw, 
-  ShieldCheck, 
   SlidersHorizontal 
 } from 'lucide-react';
 
@@ -24,175 +23,179 @@ export const CustomerRiskExplainerModal: React.FC<CustomerRiskExplainerModalProp
 
   return (
     <div 
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] shadow-2xl overflow-hidden p-6 text-zinc-900 dark:text-white"
+        className="relative w-full max-w-4xl lg:max-w-5xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111218] shadow-2xl overflow-hidden p-4 sm:p-5 text-zinc-900 dark:text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
+        {/* Header - Horizontal Compact Bar */}
+        <div className="flex items-center justify-between pb-3 mb-3.5 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700">
-              <HelpCircle className="w-5 h-5 text-zinc-600 dark:text-zinc-300" />
+            <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60 shrink-0">
+              <HelpCircle className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="font-bold text-base text-zinc-900 dark:text-white">
-                Customer risk score
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-white">
+                Customer Risk Score Engine
               </h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                How recovery risk tiers & cadences are calculated
-              </p>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
+                Autonomous Cadence Logic
+              </span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-3 py-1 rounded-lg text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 transition-opacity cursor-pointer"
+            >
+              Got it
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="py-4 space-y-4 text-xs">
+        {/* 3-Column Horizontal Grid (No scroll needed) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
           
-          {/* Main Statement Quote / Highlight Box */}
-          <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
-            <div className="border-l-2 border-zinc-900 dark:border-white pl-3 space-y-1.5">
-              <h4 className="font-mono text-xs uppercase tracking-wider font-semibold text-zinc-900 dark:text-white">
-                Customer risk score
-              </h4>
-              <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                Built from their own history: late payments, average days late, promises kept or broken, disputes and part-payment habits.
-              </p>
-              <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                Three buckets. Reliable goes to Light, Watch to Standard, High risk to Intensive. A new customer starts at Standard.
-              </p>
-              <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-medium">
-                Kept current, owner-controlled. Updates after every payment.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-zinc-200/60 dark:border-zinc-800/80">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-mono">
-                <Clock className="w-3 h-3 text-zinc-400" /> Late payments
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-mono">
-                <Clock className="w-3 h-3 text-zinc-400" /> Avg days late
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-mono">
-                <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Promises kept/broken
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-mono">
-                <AlertTriangle className="w-3 h-3 text-amber-500" /> Disputes record
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-mono sm:col-span-2">
-                <SlidersHorizontal className="w-3 h-3 text-zinc-400" /> Part-payment habits
-              </span>
-            </div>
-          </div>
-
-          {/* Three Buckets Explanation */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-mono uppercase tracking-wider text-zinc-400 text-[11px] font-semibold">
-                Three Buckets & Cadences
-              </span>
-              <span className="text-[11px] font-mono text-zinc-500">
-                A new customer starts at Standard
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {/* Reliable -> Light */}
-              <div className="p-3 rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-emerald-700 dark:text-emerald-400 font-mono">
-                    Reliable
-                  </span>
-                  <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
-                    80-100
-                  </span>
-                </div>
-                <div className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 font-mono">
-                  → Light Cadence
-                </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-normal">
-                  Polite statements and longer reminder intervals.
-                </p>
+          {/* Column 1: Historical Factors */}
+          <div className="p-3 rounded-xl bg-purple-50/30 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-900/40 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider font-semibold text-purple-700 dark:text-purple-300 mb-1.5">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-purple-500" />
+                <span>1. Evaluated History</span>
               </div>
-
-              {/* Watch -> Standard */}
-              <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-amber-700 dark:text-amber-400 font-mono">
-                    Watch
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2 leading-tight">
+                Calculated directly from customer repayment habits:
+              </p>
+              <div className="space-y-1 font-mono text-[11px]">
+                <div className="flex items-center justify-between p-1.5 rounded-md bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80">
+                  <span className="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+                    <Clock className="w-3 h-3 text-zinc-400 shrink-0" /> Late payments
                   </span>
-                  <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800">
-                    55-79
+                  <span className="text-[10px] text-zinc-400">Count</span>
+                </div>
+                <div className="flex items-center justify-between p-1.5 rounded-md bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80">
+                  <span className="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+                    <Clock className="w-3 h-3 text-zinc-400 shrink-0" /> Avg days late
                   </span>
+                  <span className="text-[10px] text-zinc-400">Velocity</span>
                 </div>
-                <div className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 font-mono">
-                  → Standard Cadence
-                </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-normal">
-                  Default for new customers. Regular balanced follow-up.
-                </p>
-              </div>
-
-              {/* High Risk -> Intensive */}
-              <div className="p-3 rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50/50 dark:bg-rose-500/5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-rose-700 dark:text-rose-400 font-mono">
-                    High Risk
+                <div className="flex items-center justify-between p-1.5 rounded-md bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80">
+                  <span className="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" /> Promises record
                   </span>
-                  <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800">
-                    &lt; 55
+                  <span className="text-[10px] text-zinc-400">Kept/Broken</span>
+                </div>
+                <div className="flex items-center justify-between p-1.5 rounded-md bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80">
+                  <span className="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+                    <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" /> Disputes record
                   </span>
+                  <span className="text-[10px] text-zinc-400">Claims</span>
                 </div>
-                <div className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 font-mono">
-                  → Intensive Cadence
+                <div className="flex items-center justify-between p-1.5 rounded-md bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80">
+                  <span className="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+                    <SlidersHorizontal className="w-3 h-3 text-zinc-400 shrink-0" /> Part-payments
+                  </span>
+                  <span className="text-[10px] text-zinc-400">Installments</span>
                 </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-normal">
-                  Accelerated schedule & AI voice calls. 2+ overdue invoices automatically route here.
-                </p>
               </div>
             </div>
           </div>
 
-          {/* Kept current, owner-controlled */}
-          <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 space-y-2">
-            <div className="flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 text-zinc-500 shrink-0" />
-              <span className="font-semibold text-zinc-900 dark:text-white text-xs">
-                Kept current, owner-controlled. Updates after every payment.
-              </span>
+          {/* Column 2: Three Buckets & Cadences */}
+          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between font-mono text-[11px] uppercase tracking-wider font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                <span>2. Three Buckets</span>
+                <span className="text-[10px] text-zinc-400 font-normal">New = Standard</span>
+              </div>
+              <div className="space-y-1.5">
+                {/* Reliable */}
+                <div className="p-2 rounded-lg border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-500/5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold font-mono text-emerald-700 dark:text-emerald-400 text-xs">Reliable</span>
+                    <span className="text-[10px] font-mono font-semibold px-1.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">80–100</span>
+                  </div>
+                  <div className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 font-mono">→ Light Cadence</div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight">Polite statements, longer reminder intervals.</p>
+                </div>
+
+                {/* Watch */}
+                <div className="p-2 rounded-lg border border-amber-200 dark:border-amber-500/20 bg-amber-50/40 dark:bg-amber-500/5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold font-mono text-amber-700 dark:text-amber-400 text-xs">Watch</span>
+                    <span className="text-[10px] font-mono font-semibold px-1.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">55–79</span>
+                  </div>
+                  <div className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 font-mono">→ Standard Cadence</div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight">Default for new customers. Balanced schedule.</p>
+                </div>
+
+                {/* High Risk */}
+                <div className="p-2 rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50/40 dark:bg-rose-500/5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold font-mono text-rose-700 dark:text-rose-400 text-xs">High Risk</span>
+                    <span className="text-[10px] font-mono font-semibold px-1.5 rounded bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400">&lt; 55</span>
+                  </div>
+                  <div className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 font-mono">→ Intensive Cadence</div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight">Accelerated touches & Voice AI. 2+ overdue route here.</p>
+                </div>
+              </div>
             </div>
-            <ul className="space-y-1.5 pl-6 list-disc text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              <li>
-                <strong>Automatic recalculation:</strong> As soon as a payment is marked paid or fetched from email, the customer&apos;s score updates in real-time.
-              </li>
-              <li>
-                <strong>Transparent breakdown:</strong> Click on any customer&apos;s score in the ledger to see the full historical breakdown (&quot;See Why&quot;).
-              </li>
-              <li>
-                <strong>Owner override &amp; lock:</strong> The owner can manually move any customer to another bucket and lock the choice so future automatic updates will not override it.
-              </li>
-            </ul>
           </div>
 
-        </div>
+          {/* Column 3: Owner Control & Real-time Updates */}
+          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                <RefreshCw className="w-3.5 h-3.5 text-zinc-500" />
+                <span>3. Owner Control</span>
+              </div>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2 leading-tight">
+                Real-time updates with complete manual override:
+              </p>
+              <div className="space-y-1.5 text-[11px]">
+                <div className="p-2 rounded-lg bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80">
+                  <div className="font-semibold text-zinc-900 dark:text-white flex items-center gap-1.5 text-[11px]">
+                    <RefreshCw className="w-3 h-3 text-emerald-500 shrink-0" />
+                    <span>Updates After Every Payment</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-tight">
+                    Recalculates instantly when payments are marked or fetched from email.
+                  </p>
+                </div>
 
-        {/* Footer */}
-        <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            Got it
-          </button>
+                <div className="p-2 rounded-lg bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80">
+                  <div className="font-semibold text-zinc-900 dark:text-white flex items-center gap-1.5 text-[11px]">
+                    <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
+                    <span>Transparent &quot;See Why&quot;</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-tight">
+                    Click any score badge in the ledger to inspect the exact historical impact.
+                  </p>
+                </div>
+
+                <div className="p-2 rounded-lg bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80">
+                  <div className="font-semibold text-zinc-900 dark:text-white flex items-center gap-1.5 text-[11px]">
+                    <Lock className="w-3 h-3 text-amber-500 shrink-0" />
+                    <span>Manual Override &amp; Lock</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-tight">
+                    Move any customer to any cadence and lock it against algorithm changes.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>

@@ -208,7 +208,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
     <section className="space-y-4">
       {/* View Switcher: Active Receivables vs Settled & Paid History */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-[#0D0E15] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+        <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-[#0D0E15] border border-slate-200 dark:border-zinc-800 shadow-xs">
           <button
             onClick={() => {
               setViewTab('active');
@@ -216,13 +216,13 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
             }}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
               viewTab === 'active'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
-                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
+                : 'text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-blue-500" />
             <span>Active Receivables (Pending)</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
               {activeInvoices.length}
             </span>
           </button>
@@ -234,13 +234,13 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
             }}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
               viewTab === 'settled'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
-                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
+                : 'text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span>Settled & Paid Archive</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
               {settledInvoices.length}
             </span>
           </button>
@@ -249,10 +249,10 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
         <button
           type="button"
           onClick={() => setShowRiskExplainer(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0D0E15] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-purple-300/80 dark:border-purple-500/40 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/60 hover:border-purple-400 dark:hover:border-purple-500 transition-all shadow-xs cursor-pointer self-start sm:self-auto"
           title="See how customer risk score is calculated"
         >
-          <HelpCircle className="w-3.5 h-3.5 text-zinc-400" />
+          <HelpCircle className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
           <span>How are risk scores calculated?</span>
         </button>
       </div>
@@ -275,7 +275,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                   selectedBucket === b
                     ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
-                    : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-transparent hover:border-zinc-300 dark:hover:border-zinc-700'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 shadow-xs'
                 }`}
               >
                 <span>{b === 'all' ? (viewTab === 'active' ? 'All Active' : 'All Settled') : b}</span>
@@ -296,7 +296,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
               placeholder="Search customer, invoice..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg text-xs sm:text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
+              className="w-full pl-9 pr-3 py-1.5 rounded-lg text-xs sm:text-sm bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-purple-500 dark:focus:border-zinc-600 shadow-xs"
             />
           </div>
 
@@ -305,7 +305,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
               aria-label="Filter status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer shadow-xs"
             >
               <option value="all">All Active States</option>
               <option value="active">Active</option>
@@ -314,7 +314,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
               <option value="promise">Promised</option>
             </select>
           ) : (
-            <div className="px-2.5 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-lg whitespace-nowrap">
+            <div className="px-2.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-lg whitespace-nowrap shadow-xs">
               Settled Archive
             </div>
           )}
@@ -323,7 +323,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
             aria-label="Sort ledger"
             value={sortField}
             onChange={(e) => setSortField(e.target.value as any)}
-            className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer hidden sm:block"
+            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer hidden sm:block shadow-xs"
           >
             <option value="dueDate">Overdue Days</option>
             <option value="amount">Amount</option>
@@ -332,7 +332,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
 
           <button
             onClick={() => setSortAsc(!sortAsc)}
-            className="p-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+            className="p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-zinc-600 hover:text-zinc-900 dark:hover:text-white shadow-xs"
             title="Sort Order"
           >
             <ArrowUpDown className="w-3.5 h-3.5" />
@@ -342,11 +342,11 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
       </div>
 
       {/* Structured Customer Ledger Table */}
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0D0E15] shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-200/90 dark:border-zinc-800 bg-white dark:bg-[#0D0E15] shadow-[0_1px_3px_rgba(0,0,0,0.03),0_8px_24px_rgba(124,58,237,0.03)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#12131C] text-zinc-600 dark:text-zinc-400 font-mono text-xs uppercase tracking-wider divide-x divide-zinc-200 dark:divide-zinc-800/80">
+              <tr className="border-b border-slate-200 dark:border-zinc-800 bg-slate-50/90 dark:bg-[#12131C] text-slate-700 dark:text-zinc-400 font-mono text-xs uppercase tracking-wider divide-x divide-slate-200 dark:divide-zinc-800/80">
                 <th className="py-3.5 px-4 font-semibold min-w-[220px]">Customer / Company</th>
                 <th className="py-3.5 px-4 font-semibold min-w-[140px]">Invoice Ref</th>
                 <th className="py-3.5 px-4 font-semibold text-right min-w-[130px]">Amount</th>
@@ -360,7 +360,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                         e.stopPropagation();
                         setShowRiskExplainer(true);
                       }}
-                      className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                      className="p-1 rounded-md bg-purple-100/70 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60 hover:bg-purple-200 dark:hover:bg-purple-900/80 transition-colors cursor-pointer"
                       title="How are risk scores calculated?"
                       aria-label="How are risk scores calculated?"
                     >
@@ -373,7 +373,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                 <th className="py-3.5 px-4 font-semibold text-right min-w-[140px]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 text-sm">
+            <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60 text-sm">
               {sorted.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-zinc-500 text-sm">
@@ -390,7 +390,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                     <tr
                       key={inv.id}
                       onClick={() => onRowClick(inv)}
-                      className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors cursor-pointer divide-x divide-zinc-200 dark:divide-zinc-800/60"
+                      className="hover:bg-purple-50/35 dark:hover:bg-zinc-800/40 transition-colors cursor-pointer divide-x divide-slate-100 dark:divide-zinc-800/60"
                     >
                       {/* Customer / Company - Monogram avatar + details */}
                       <td className="py-3.5 px-4">

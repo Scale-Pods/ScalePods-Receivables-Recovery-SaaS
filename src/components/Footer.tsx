@@ -3,48 +3,53 @@ import { ShieldCheck, Heart } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="border-t border-zinc-800 bg-[#05060A] text-zinc-400 py-14">
+    <footer className="border-t border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#05060A] text-zinc-600 dark:text-zinc-400 py-14 transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 pb-12 border-b border-zinc-800/80">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 pb-12 border-b border-slate-200 dark:border-zinc-800/80">
           
           {/* Brand Col */}
           <div className="col-span-2 space-y-3">
             <div className="flex items-center">
               <img
+                src="/scalepods-logo-dark.png"
+                alt="ScalePods"
+                className="h-7 w-auto object-contain dark:hidden"
+              />
+              <img
                 src="/scalepods-logo-white.png"
                 alt="ScalePods"
-                className="h-7 w-auto object-contain"
+                className="h-7 w-auto object-contain hidden dark:block"
               />
             </div>
             
-            <p className="text-xs sm:text-sm text-zinc-400 max-w-sm leading-relaxed">
+            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 max-w-sm leading-relaxed">
               Autonomous B2B Receivables Recovery Platform. Helping CFOs and credit control teams recover locked cash flow without awkward calls or customer relationship damage.
             </p>
 
             <div className="pt-2 flex items-center gap-2 text-xs font-mono text-zinc-500">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <ShieldCheck className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
               <span>SOC2 Type II • ISO 27001 Certified • RBI Compliant</span>
             </div>
           </div>
 
           {/* Product Col */}
           <div className="space-y-3">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-900 dark:text-white">
               Platform
             </h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="#engine" className="hover:text-white transition-colors">21-Day Engine</a></li>
-              <li><a href="#channels" className="hover:text-white transition-colors">WhatsApp Cloud API</a></li>
-              <li><a href="#channels" className="hover:text-white transition-colors">Voice AI Call Agent</a></li>
-              <li><a href="#engine" className="hover:text-white transition-colors">Day 22 Escalation</a></li>
-              <li><a href="#comparison" className="hover:text-white transition-colors">Enterprise Benchmark</a></li>
+              <li><a href="#engine" className="hover:text-zinc-900 dark:hover:text-white transition-colors">21-Day Engine</a></li>
+              <li><a href="#channels" className="hover:text-zinc-900 dark:hover:text-white transition-colors">WhatsApp Cloud API</a></li>
+              <li><a href="#channels" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Voice AI Call Agent</a></li>
+              <li><a href="#engine" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Day 22 Escalation</a></li>
+              <li><a href="#comparison" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Enterprise Benchmark</a></li>
             </ul>
           </div>
 
           {/* Integrations Col */}
           <div className="space-y-3">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-900 dark:text-white">
               Integrations
             </h4>
             <ul className="space-y-2 text-xs">
@@ -58,15 +63,15 @@ export const Footer: React.FC = () => {
 
           {/* Legal & Security Col */}
           <div className="space-y-3">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-900 dark:text-white">
               Security & Legal
             </h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="#faq" className="hover:text-white transition-colors">Privacy Policy</a></li>
-              <li><a href="#faq" className="hover:text-white transition-colors">Terms of Service</a></li>
-              <li><a href="#faq" className="hover:text-white transition-colors">Data Processing Addendum</a></li>
-              <li><a href="#faq" className="hover:text-white transition-colors">Section 138 Compliance</a></li>
-              <li><a href="#faq" className="hover:text-white transition-colors">RBI Fair Practices Code</a></li>
+              <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Privacy Policy</a></li>
+              <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Terms of Service</a></li>
+              <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Data Processing Addendum</a></li>
+              <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Section 138 Compliance</a></li>
+              <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">RBI Fair Practices Code</a></li>
             </ul>
           </div>
 

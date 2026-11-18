@@ -28,14 +28,14 @@ export const TodaysFocusBlock: React.FC<TodaysFocusBlockProps> = ({
   const getBadgeStyle = (variant: FocusItem['badgeVariant']) => {
     switch (variant) {
       case 'amber':
-        return 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20';
+        return 'text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200/80 dark:border-amber-500/20';
       case 'rose':
-        return 'text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20';
+        return 'text-rose-800 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200/80 dark:border-rose-500/20';
       case 'emerald':
-        return 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+        return 'text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200/80 dark:border-emerald-500/20';
       case 'purple':
       default:
-        return 'text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700';
+        return 'text-purple-800 dark:text-zinc-300 bg-purple-50 dark:bg-zinc-800 border-purple-200/80 dark:border-zinc-700';
     }
   };
 
@@ -50,7 +50,7 @@ export const TodaysFocusBlock: React.FC<TodaysFocusBlockProps> = ({
         </h2>
       </div>
 
-      <div className="relative rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-4 shadow-card-light dark:shadow-card-dark overflow-hidden">
+      <div className="relative rounded-2xl border border-slate-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-4 sm:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_10px_25px_rgba(124,58,237,0.03)] overflow-hidden">
         
         {/* Tier Lock State */}
         {isLocked && (
@@ -81,7 +81,7 @@ export const TodaysFocusBlock: React.FC<TodaysFocusBlockProps> = ({
             <p className="mt-0.5">No pending owner approvals or escalations right now.</p>
           </div>
         ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+          <div className="divide-y divide-slate-100 dark:divide-zinc-800/80">
             {items.map((item) => (
               <div
                 key={item.id}
@@ -99,7 +99,7 @@ export const TodaysFocusBlock: React.FC<TodaysFocusBlockProps> = ({
                         {formatINR(item.amount)}
                       </span>
                       <span className="text-zinc-400">•</span>
-                      <span className="text-xs text-zinc-600 dark:text-zinc-300 font-medium truncate">
+                      <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium truncate">
                         {item.customerName} ({item.company})
                       </span>
                       <span className="text-zinc-400 font-mono text-[10px] hidden sm:inline">
@@ -118,7 +118,7 @@ export const TodaysFocusBlock: React.FC<TodaysFocusBlockProps> = ({
                   {item.actionSecondary && (
                     <button
                       onClick={() => onActionClick(item, item.actionSecondary!.actionKey)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-slate-200 dark:border-zinc-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors shadow-xs"
                     >
                       {item.actionSecondary.label}
                     </button>
@@ -126,7 +126,7 @@ export const TodaysFocusBlock: React.FC<TodaysFocusBlockProps> = ({
 
                   <button
                     onClick={() => onActionClick(item, item.actionPrimary.actionKey)}
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-xs"
                   >
                     {item.actionPrimary.label}
                   </button>

@@ -79,12 +79,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside 
-      className={`relative flex flex-col h-screen sticky top-0 border-r border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-[#07080D] transition-all duration-200 z-30 select-none ${
+      className={`relative flex flex-col h-screen sticky top-0 border-r border-slate-200/90 dark:border-zinc-800/80 bg-white/95 dark:bg-[#07080D] backdrop-blur-md shadow-[1px_0_4px_rgba(0,0,0,0.02)] dark:shadow-none transition-all duration-200 z-30 select-none ${
         isCollapsed ? 'w-16' : 'w-64'
       }`}
     >
       {/* Brand Header */}
-      <div className={`h-[70px] shrink-0 box-border border-b border-zinc-200 dark:border-zinc-800/80 flex items-center ${
+      <div className={`h-[70px] shrink-0 box-border border-b border-slate-200/90 dark:border-zinc-800/80 flex items-center ${
         isCollapsed ? 'px-2 justify-between' : 'px-4 justify-between'
       }`}>
         {!isCollapsed ? (
@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Quick Action */}
-      <div className="p-3 border-b border-zinc-200 dark:border-zinc-800/60">
+      <div className="p-3 border-b border-slate-200/90 dark:border-zinc-800/60">
         <button
           onClick={() => setActiveTab('intake')}
           className={`w-full py-2 px-3.5 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
@@ -156,10 +156,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
                 isActive
-                  ? 'bg-purple-600/15 text-purple-700 dark:text-purple-300 font-bold'
-                  : 'text-zinc-600 dark:text-zinc-400 font-medium hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                  ? 'bg-purple-50 text-purple-700 dark:bg-purple-600/15 dark:text-purple-300 font-bold border border-purple-200/80 dark:border-transparent shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 font-medium hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100/80 dark:hover:bg-zinc-900'
               }`}
               title={item.label}
             >
@@ -181,10 +181,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Bottom Controls */}
-      <div className="border-t border-zinc-200 dark:border-zinc-800/80 p-3 space-y-2">
+      <div className="border-t border-slate-200/90 dark:border-zinc-800/80 p-3 space-y-2">
         {/* Monthly Quota Mini Card */}
         {!isCollapsed && quota && (
-          <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 space-y-2 text-xs">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-50/50 via-white to-slate-50 dark:from-zinc-900/60 dark:to-zinc-900/60 border border-purple-200/60 dark:border-zinc-800/80 space-y-2 text-xs shadow-xs">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-[11px] text-zinc-500 dark:text-zinc-400">Monthly Quota</span>
             </div>

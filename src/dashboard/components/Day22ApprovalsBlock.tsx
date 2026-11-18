@@ -218,7 +218,7 @@ export const Day22ApprovalsBlock: React.FC<Day22ApprovalsBlockProps> = ({
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                 filterType === tab.id
                   ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-sm font-semibold'
-                  : 'bg-white dark:bg-zinc-900/60 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:text-zinc-900 dark:hover:text-white'
+                  : 'bg-white dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-400 border border-slate-200 dark:border-zinc-800 hover:text-zinc-900 dark:hover:text-white shadow-xs'
               }`}
             >
               {tab.label}
@@ -226,7 +226,7 @@ export const Day22ApprovalsBlock: React.FC<Day22ApprovalsBlockProps> = ({
           ))}
         </div>
 
-        <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 cursor-pointer select-none">
+        <label className="flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-400 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={showApprovedOnly}
@@ -247,8 +247,8 @@ export const Day22ApprovalsBlock: React.FC<Day22ApprovalsBlockProps> = ({
               key={item.id}
               className={`rounded-2xl border p-5 transition-all duration-200 flex flex-col justify-between ${
                 isApproved
-                  ? 'border-emerald-500/30 bg-emerald-500/[0.02] dark:bg-emerald-950/10'
-                  : 'border-zinc-200 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] hover:border-zinc-300 dark:hover:border-zinc-700 shadow-sm'
+                  ? 'border-emerald-500/30 bg-emerald-500/[0.03] dark:bg-emerald-950/10'
+                  : 'border-slate-200/90 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] hover:border-purple-300 dark:hover:border-zinc-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_8px_20px_rgba(124,58,237,0.03)]'
               }`}
             >
               <div className="space-y-4">
@@ -288,8 +288,8 @@ export const Day22ApprovalsBlock: React.FC<Day22ApprovalsBlockProps> = ({
 
                 {/* Statutory Calculation Breakdown Box */}
                 {item.statutoryCalculation && (
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50 dark:bg-zinc-900/50 p-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400 pb-2 border-b border-zinc-200/80 dark:border-zinc-800">
+                  <div className="rounded-xl border border-slate-200 dark:border-zinc-800/80 bg-slate-50/80 dark:bg-zinc-900/50 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400 pb-2 border-b border-slate-200 dark:border-zinc-800">
                       <span>Statutory Basis</span>
                       <span className="text-zinc-800 dark:text-zinc-200 font-medium text-right max-w-[240px] truncate">
                         Section 16 MSMED Act 2006 (19.5% p.a.)
@@ -297,21 +297,21 @@ export const Day22ApprovalsBlock: React.FC<Day22ApprovalsBlockProps> = ({
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
-                      <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800">
+                      <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-xs">
                         <div className="text-[10px] text-zinc-500 uppercase">Principal</div>
                         <div className="font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5">
                           {formatINR(item.statutoryCalculation.principal)}
                         </div>
                       </div>
 
-                      <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800">
+                      <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-xs">
                         <div className="text-[10px] text-blue-600 dark:text-blue-400 uppercase">Compound Interest</div>
                         <div className="font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
                           +{formatINR(item.statutoryCalculation.interestAmount)}
                         </div>
                       </div>
 
-                      <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800">
+                      <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-xs">
                         <div className="text-[10px] text-zinc-500 uppercase">Filing Fee</div>
                         <div className="font-semibold text-zinc-700 dark:text-zinc-300 mt-0.5">
                           +{formatINR(item.statutoryCalculation.statutoryCompensationFee)}
@@ -319,7 +319,7 @@ export const Day22ApprovalsBlock: React.FC<Day22ApprovalsBlockProps> = ({
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between font-mono text-xs">
+                    <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between font-mono text-xs">
                       <span className="font-semibold text-zinc-700 dark:text-zinc-300">Enforceable Total Claim:</span>
                       <span className="font-bold text-sm text-zinc-900 dark:text-white tabular-nums">
                         {formatINR(item.statutoryCalculation.totalClaimAmount)}

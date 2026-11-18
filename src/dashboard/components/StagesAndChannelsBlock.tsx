@@ -140,8 +140,8 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
         )}
 
         {/* Funnel Pipeline Section */}
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] p-5 shadow-sm mb-6">
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="rounded-2xl border border-slate-200/90 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_8px_24px_rgba(124,58,237,0.03)] mb-6">
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-zinc-800">
             <div>
               <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
                 Invoice Recovery Funnel
@@ -165,8 +165,8 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
                   onClick={() => onFilterByStage && onFilterByStage(stg.id)}
                   className={`rounded-xl border p-3.5 transition-all cursor-pointer flex flex-col justify-between ${
                     isSettled
-                      ? 'border-emerald-500/30 bg-emerald-500/[0.03] dark:bg-emerald-950/10 hover:border-emerald-500/50'
-                      : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700'
+                      ? 'border-emerald-500/30 bg-emerald-500/[0.04] dark:bg-emerald-950/10 hover:border-emerald-500/50'
+                      : 'border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-900/40 hover:border-purple-300 dark:hover:border-zinc-700 hover:bg-purple-50/20'
                   }`}
                 >
                   <div>
@@ -210,8 +210,8 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
         </div>
 
         {/* Outreach Channels Side-by-Side */}
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] p-5 shadow-sm">
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="rounded-2xl border border-slate-200/90 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_8px_24px_rgba(124,58,237,0.03)]">
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-zinc-800">
             <div>
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-zinc-500" />
@@ -232,7 +232,7 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
             {channels.map((chan) => (
               <div
                 key={chan.channel}
-                className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0E0F17] p-4 flex flex-col justify-between shadow-sm"
+                className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#0E0F17] p-4 flex flex-col justify-between shadow-xs hover:border-slate-300 dark:hover:border-zinc-700 transition-colors"
               >
                 <div>
                   {/* Channel Header */}

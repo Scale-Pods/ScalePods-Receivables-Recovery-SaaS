@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, ArrowRight, LogOut, Sparkles, Building2, LayoutDashboard } from 'lucide-react';
+import { Menu, X, ArrowRight, LogOut, Sparkles, Building2, LayoutDashboard, Sun, Moon } from 'lucide-react';
 import { navigationLinks } from '../data/landingData';
 import { UserAccount } from '../types/auth';
 
@@ -9,6 +9,8 @@ interface NavbarProps {
   onSignOut: () => void;
   onOpenUpgrade: () => void;
   onSwitchToDashboard?: () => void;
+  isDark?: boolean;
+  onToggleTheme?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -17,6 +19,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSignOut,
   onOpenUpgrade,
   onSwitchToDashboard,
+  isDark = true,
+  onToggleTheme,
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -43,8 +47,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 h-[72px] flex items-center ${
         isScrolled
-          ? 'bg-[#07080D]/90 backdrop-blur-md border-b border-zinc-800/80 shadow-lg shadow-black/20'
-          : 'bg-transparent border-b border-white/5'
+          ? 'bg-white/90 dark:bg-[#07080D]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-zinc-800/80 shadow-md shadow-purple-900/5 dark:shadow-black/20'
+          : 'bg-transparent border-b border-slate-200/40 dark:border-white/5'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex items-center justify-between">
@@ -52,7 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Brand Logo - ScalePods */}
         <a href="#" className="flex items-center group cursor-pointer select-none">
           <img
-            src="/scalepods-logo-white.png"
+            src={isDark ? '/scalepods-logo-white.png' : '/scalepods-logo-dark.png'}
             alt="ScalePods"
             className="h-6 w-auto object-contain transition-opacity group-hover:opacity-90"
           />
@@ -64,7 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <a
               key={link.label}
               href={link.href}
-              className="text-xs lg:text-sm font-medium text-zinc-400 hover:text-white transition-colors relative group py-1"
+              className="text-xs lg:text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-purple-600 dark:hover:text-white transition-colors relative group py-1"
             >
               {link.label}
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-500 to-indigo-500 group-hover:w-full transition-all duration-200" />
@@ -74,37 +78,49 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Action / User Account Area */}
         <div className="hidden sm:flex items-center gap-3">
+          {/* Light / Dark Mode Toggle Button */}
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className="p-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors border border-slate-200 dark:border-zinc-800"
+              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label="Toggle theme"
+            >
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-purple-600" />}
+            </button>
+          )}
+
           {currentUser ? (
             /* Logged-In User Profile Pill */
             <div className="flex items-center gap-2.5">
               
               {/* Account Capsule */}
               <div 
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800 hover:border-purple-500/40 transition-all shadow-sm"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 hover:border-purple-500/40 transition-all shadow-sm"
               >
                 {/* Company Logo Image or Initials Avatar */}
                 {currentUser.companyLogo ? (
                   <img
                     src={currentUser.companyLogo}
                     alt={currentUser.companyName}
-                    className="w-6 h-6 rounded-md object-contain bg-black/50 border border-zinc-700/60 p-0.5"
+                    className="w-6 h-6 rounded-md object-contain bg-white dark:bg-black/50 border border-slate-200 dark:border-zinc-700/60 p-0.5"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-md bg-purple-600/20 text-purple-300 font-bold text-[10px] flex items-center justify-center border border-purple-500/30 font-mono">
+                  <div className="w-6 h-6 rounded-md bg-purple-100 dark:bg-purple-600/20 text-purple-700 dark:text-purple-300 font-bold text-[10px] flex items-center justify-center border border-purple-200 dark:border-purple-500/30 font-mono">
                     {getInitials(currentUser.companyName)}
                   </div>
                 )}
 
                 {/* Company & Tier Details */}
                 <div className="text-left">
-                  <div className="text-xs font-bold text-white leading-tight max-w-[130px] truncate">
+                  <div className="text-xs font-bold text-zinc-900 dark:text-white leading-tight max-w-[130px] truncate">
                     {currentUser.companyName}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 capitalize font-bold">
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 capitalize font-bold">
                       {currentUser.planTier}
                     </span>
-                    <span className="text-[10px] text-zinc-400 font-mono hidden lg:inline truncate max-w-[90px]">
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono hidden lg:inline truncate max-w-[90px]">
                       {currentUser.name}
                     </span>
                   </div>
@@ -125,9 +141,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               {/* Upgrade Tier Button */}
               <button
                 onClick={onOpenUpgrade}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-zinc-800 dark:text-white bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 transition-all cursor-pointer flex items-center gap-1.5"
               >
-                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                 <span>Upgrade</span>
               </button>
 
@@ -135,7 +151,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={onSignOut}
                 title="Sign Out"
-                className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -146,14 +162,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center gap-2.5">
               <button
                 onClick={() => onOpenAuth('signin')}
-                className="text-sm font-medium text-zinc-300 hover:text-white px-4 py-2 rounded-xl transition-colors hover:bg-zinc-800/60 cursor-pointer whitespace-nowrap"
+                className="text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:text-purple-600 dark:hover:text-white px-4 py-2 rounded-xl transition-colors hover:bg-slate-100 dark:hover:bg-zinc-800/60 cursor-pointer whitespace-nowrap"
               >
                 Log In
               </button>
               
               <button
                 onClick={() => onOpenAuth('signup')}
-                className="relative group overflow-hidden px-5 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-[0_2px_16px_rgba(124,58,237,0.4)] transition-all duration-200 cursor-pointer flex items-center gap-2 whitespace-nowrap"
+                className="relative group overflow-hidden px-5 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-[0_2px_16px_rgba(124,58,237,0.35)] transition-all duration-200 cursor-pointer flex items-center gap-2 whitespace-nowrap"
               >
                 <span>Create Account</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
@@ -164,6 +180,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Hamburger Button */}
         <div className="flex md:hidden items-center gap-2">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className="p-1.5 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              aria-label="Toggle theme"
+            >
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-purple-600" />}
+            </button>
+          )}
+
           {currentUser ? (
             <button
               onClick={onOpenUpgrade}
@@ -175,7 +201,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => onOpenAuth('signin')}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-300 hover:text-white border border-zinc-800"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-purple-600 dark:hover:text-white border border-slate-200 dark:border-zinc-800"
               >
                 Log In
               </button>
@@ -190,7 +216,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+            className="p-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800/60"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -201,14 +227,14 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden absolute top-[70px] left-0 right-0 bg-[#0B0C13]/98 border-b border-zinc-800 px-6 py-6 shadow-2xl space-y-4 backdrop-blur-xl animate-in slide-in-from-top-4 duration-200">
+        <div className="md:hidden absolute top-[70px] left-0 right-0 bg-white/98 dark:bg-[#0B0C13]/98 border-b border-slate-200 dark:border-zinc-800 px-6 py-6 shadow-2xl space-y-4 backdrop-blur-xl animate-in slide-in-from-top-4 duration-200">
           <div className="flex flex-col space-y-3">
             {navigationLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-medium text-zinc-300 hover:text-white py-2 border-b border-zinc-800/50"
+                className="text-sm font-medium text-zinc-800 dark:text-zinc-300 hover:text-purple-600 dark:hover:text-white py-2 border-b border-slate-100 dark:border-zinc-800/50"
               >
                 {link.label}
               </a>
@@ -218,9 +244,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="pt-2 flex flex-col gap-2.5">
             {currentUser ? (
               <>
-                <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-xs space-y-1">
-                  <div className="font-bold text-white">{currentUser.companyName}</div>
-                  <div className="text-zinc-400 font-mono">{currentUser.name} • Tier: <span className="text-purple-300 capitalize">{currentUser.planTier}</span></div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs space-y-1">
+                  <div className="font-bold text-zinc-900 dark:text-white">{currentUser.companyName}</div>
+                  <div className="text-zinc-500 dark:text-zinc-400 font-mono">{currentUser.name} • Tier: <span className="text-purple-600 dark:text-purple-300 capitalize font-bold">{currentUser.planTier}</span></div>
                 </div>
                 {onSwitchToDashboard && (
                   <button
@@ -239,7 +265,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setMobileMenuOpen(false);
                     onOpenUpgrade();
                   }}
-                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-zinc-800 text-center"
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-zinc-800 dark:text-white bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-center border border-slate-200 dark:border-zinc-700"
                 >
                   Upgrade Tier
                 </button>
@@ -248,7 +274,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setMobileMenuOpen(false);
                     onSignOut();
                   }}
-                  className="w-full py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white border border-zinc-800 text-center"
+                  className="w-full py-2 rounded-xl text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-slate-200 dark:border-zinc-800 text-center"
                 >
                   Sign Out
                 </button>
@@ -260,7 +286,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setMobileMenuOpen(false);
                     onOpenAuth('signin');
                   }}
-                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-zinc-300 hover:text-white border border-zinc-800 text-center"
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:text-purple-600 dark:hover:text-white border border-slate-200 dark:border-zinc-800 text-center"
                 >
                   Log In
                 </button>

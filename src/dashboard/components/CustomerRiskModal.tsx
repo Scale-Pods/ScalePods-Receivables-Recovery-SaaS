@@ -116,10 +116,10 @@ export const CustomerRiskModal: React.FC<CustomerRiskModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowExplainer(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-purple-300/80 dark:border-purple-500/40 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/60 transition-colors cursor-pointer"
                 title="How are risk scores calculated?"
               >
-                <HelpCircle className="w-3.5 h-3.5 text-zinc-400" />
+                <HelpCircle className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                 <span className="hidden sm:inline">How are risk scores calculated?</span>
                 <span className="sm:hidden">Explain</span>
               </button>
@@ -271,9 +271,9 @@ export const CustomerRiskModal: React.FC<CustomerRiskModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowExplainer(true)}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors cursor-pointer"
               >
-                <HelpCircle className="w-3 h-3 text-zinc-400" />
+                <HelpCircle className="w-3 h-3 text-purple-500 dark:text-purple-400" />
                 <span>How are risk scores calculated?</span>
               </button>
             </div>

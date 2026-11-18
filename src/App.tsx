@@ -14,6 +14,26 @@ import { DashboardView } from './dashboard/App';
 import { signOutUser, updatePlanTierInSupabase, isSupabaseConfigured, supabase } from './lib/supabase';
 
 export function App() {
+  // Theme state shared across Landing Page and Dashboard
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    try {
+      const storedTheme = localStorage.getItem('recovr_theme');
+      if (storedTheme) return storedTheme === 'dark';
+    } catch {}
+    return true;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('recovr_theme', isDark ? 'dark' : 'light');
+    } catch {}
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
   // Navigation View: 'landing' (marketing site) | 'dashboard' (Recovery SaaS core system)
   const [activeView, setActiveView] = useState<'landing' | 'dashboard'>('landing');
 
@@ -185,12 +205,14 @@ export function App() {
   // If user is logged in and viewing Dashboard, render full Recovery SaaS system
   if (activeView === 'dashboard') {
     return (
-      <div className="min-h-screen bg-[#07080D] text-zinc-100 flex flex-col font-sans antialiased">
+      <div className="min-h-screen bg-[#F8F9FD] dark:bg-[#07080D] text-zinc-900 dark:text-zinc-100 flex flex-col font-sans transition-colors duration-200 antialiased">
         <DashboardView
           currentUser={currentUser}
           onSignOut={handleSignOut}
           onSwitchToLanding={handleSwitchToLanding}
           onOpenUpgrade={handleOpenUpgradeFromNavbar}
+          isDark={isDark}
+          setIsDark={setIsDark}
         />
 
         {/* Tier Purchase / Upgrade Checkout Modal */}
@@ -209,7 +231,7 @@ export function App() {
 
   // Otherwise, render High-Tech Landing Page
   return (
-    <div className="min-h-screen bg-[#07080D] text-zinc-100 flex flex-col font-sans selection:bg-purple-600/30 selection:text-purple-300 antialiased">
+    <div className="min-h-screen bg-[#F8F9FD] dark:bg-[#07080D] text-zinc-900 dark:text-zinc-100 flex flex-col font-sans selection:bg-purple-600/30 selection:text-purple-300 transition-colors duration-200 antialiased">
       
       {/* Top Minimal Sticky Navigation with User Account state & Go to Dashboard */}
       <Navbar
@@ -218,6 +240,8 @@ export function App() {
         onSignOut={handleSignOut}
         onOpenUpgrade={handleOpenUpgradeFromNavbar}
         onSwitchToDashboard={handleSwitchToDashboard}
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((prev) => !prev)}
       />
 
       {/* Main Marketing Page Flow */}

@@ -60,6 +60,8 @@ export interface DashboardViewProps {
   onSignOut?: () => void;
   onSwitchToLanding?: () => void;
   onOpenUpgrade?: () => void;
+  isDark?: boolean;
+  setIsDark?: (dark: boolean) => void;
 }
 
 export function DashboardView({
@@ -67,9 +69,29 @@ export function DashboardView({
   onSignOut,
   onSwitchToLanding,
   onOpenUpgrade,
+  isDark: propIsDark,
+  setIsDark: propSetIsDark,
 }: DashboardViewProps = {}) {
   // Theme state
-  const [isDark, setIsDark] = useState<boolean>(true);
+  const [internalDark, setInternalDark] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('recovr_theme');
+      if (saved) return saved === 'dark';
+    } catch {}
+    return true;
+  });
+
+  const isDark = propIsDark !== undefined ? propIsDark : internalDark;
+  const setIsDark = (val: boolean) => {
+    if (propSetIsDark) {
+      propSetIsDark(val);
+    } else {
+      setInternalDark(val);
+    }
+    try {
+      localStorage.setItem('recovr_theme', val ? 'dark' : 'light');
+    } catch {}
+  };
 
   // Active Tab: 'overview' | 'ledger' | 'intake' | 'sequence' | 'simulator' | 'day22' | 'channels' | 'forecast'
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
@@ -1108,7 +1130,12 @@ export function DashboardView({
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#FAFAFB] dark:bg-[#07080D] text-zinc-900 dark:text-zinc-100 transition-colors duration-150">
+    <div className="flex h-screen overflow-hidden bg-[#F8F9FD] dark:bg-[#07080D] text-zinc-900 dark:text-zinc-100 transition-colors duration-150 relative">
+      {/* Subtle ambient light gradient mesh for executive light mode */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden -z-0 dark:hidden">
+        <div className="absolute -top-32 left-1/3 w-[550px] h-[350px] bg-purple-500/[0.04] rounded-full blur-3xl" />
+        <div className="absolute top-1/3 -right-24 w-[450px] h-[350px] bg-indigo-500/[0.03] rounded-full blur-3xl" />
+      </div>
       
       {/* Left Sidebar Navigation (Replaces overcrowded horizontal navbar) */}
       <Sidebar

@@ -247,10 +247,10 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowRiskExplainer(true)}
-                      className="inline-flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors cursor-pointer"
                       title="How are risk scores calculated?"
                     >
-                      <HelpCircle className="w-3 h-3 text-zinc-400" />
+                      <HelpCircle className="w-3 h-3 text-purple-500 dark:text-purple-400" />
                       <span>How are risk scores calculated?</span>
                     </button>
                   </div>

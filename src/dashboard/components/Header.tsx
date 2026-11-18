@@ -58,11 +58,11 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-20 h-[70px] shrink-0 box-border border-b border-zinc-200 dark:border-zinc-800/80 bg-white/90 dark:bg-[#07080D]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between">
+    <header className="sticky top-0 z-20 h-[70px] shrink-0 box-border border-b border-slate-200/90 dark:border-zinc-800/80 bg-white/90 dark:bg-[#07080D]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
       
       {/* Title */}
       <div className="flex items-center gap-3">
-        <CurrentIcon className="w-5 h-5 text-purple-500 dark:text-purple-400 flex-shrink-0" />
+        <CurrentIcon className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
         <h1 className="text-base font-semibold text-zinc-900 dark:text-white tracking-tight">
           {current.title}
         </h1>
@@ -85,7 +85,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {onSignOut && (
           <button
             onClick={onSignOut}
-            className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
             title="Sign Out"
           >
             <LogOut className="w-4 h-4" />

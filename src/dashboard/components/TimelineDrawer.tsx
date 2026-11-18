@@ -13,7 +13,8 @@ import {
   PlayCircle, 
   Lock,
   ExternalLink,
-  SlidersHorizontal
+  SlidersHorizontal,
+  HelpCircle
 } from 'lucide-react';
 import { 
   Invoice, 
@@ -22,6 +23,7 @@ import {
 } from '../types/dashboard';
 import { formatINR } from '../utils/formatters';
 import { CompanyAvatar } from './CompanyAvatar';
+import { CustomerRiskExplainerModal } from './CustomerRiskExplainerModal';
 
 interface TimelineDrawerProps {
   invoice: Invoice | null;
@@ -52,6 +54,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
   onInspectRisk,
   onApproveSettlement,
 }) => {
+  const [showRiskExplainer, setShowRiskExplainer] = React.useState(false);
   if (!invoice) return null;
 
   const isFreePlan = planTier === 'free';
@@ -237,9 +240,20 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
             {customer && (
               <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-4">
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
-                    Customer Risk & Cadence Profile
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
+                      Customer Risk & Cadence Profile
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowRiskExplainer(true)}
+                      className="inline-flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                      title="How are risk scores calculated?"
+                    >
+                      <HelpCircle className="w-3 h-3 text-zinc-400" />
+                      <span>How are risk scores calculated?</span>
+                    </button>
+                  </div>
 
                   <button
                     onClick={() => onInspectRisk(customer)}
@@ -364,6 +378,12 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
         </div>
 
       </div>
+
+      {/* Customer Risk Explainer Modal */}
+      <CustomerRiskExplainerModal
+        isOpen={showRiskExplainer}
+        onClose={() => setShowRiskExplainer(false)}
+      />
     </div>
   );
 };

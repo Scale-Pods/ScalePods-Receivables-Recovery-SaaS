@@ -4,7 +4,8 @@ import {
   Lock, 
   Unlock, 
   Check, 
-  History
+  History,
+  HelpCircle
 } from 'lucide-react';
 import { 
   CustomerProfile, 
@@ -12,6 +13,7 @@ import {
   CadenceIntensity 
 } from '../types/dashboard';
 import { CompanyAvatar } from './CompanyAvatar';
+import { CustomerRiskExplainerModal } from './CustomerRiskExplainerModal';
 
 interface CustomerRiskModalProps {
   customer: CustomerProfile | null;
@@ -35,6 +37,7 @@ export const CustomerRiskModal: React.FC<CustomerRiskModalProps> = ({
   const [selectedTier, setSelectedTier] = useState<CustomerRiskTier>(customer.riskTier);
   const [isLocked, setIsLocked] = useState<boolean>(customer.isLockedByOwner);
   const [lockedReason, setLockedReason] = useState<string>(customer.lockedReason || '');
+  const [showExplainer, setShowExplainer] = useState<boolean>(false);
 
   const getCadenceForTier = (tier: CustomerRiskTier): CadenceIntensity => {
     switch (tier) {
@@ -101,7 +104,7 @@ export const CustomerRiskModal: React.FC<CustomerRiskModalProps> = ({
         <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
           
           {/* Real-time Update Notice */}
-          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <History className="w-4 h-4 text-zinc-400 shrink-0" />
               <div>
@@ -109,9 +112,21 @@ export const CustomerRiskModal: React.FC<CustomerRiskModalProps> = ({
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{customer.lastUpdatedAfterPayment}</p>
               </div>
             </div>
-            <div className="text-right font-mono">
-              <span className="text-lg font-bold text-zinc-900 dark:text-white">{customer.riskScore}/100</span>
-              <div className="text-[10px] text-zinc-400">Score</div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowExplainer(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                title="How are risk scores calculated?"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-zinc-400" />
+                <span className="hidden sm:inline">How are risk scores calculated?</span>
+                <span className="sm:hidden">Explain</span>
+              </button>
+              <div className="text-right font-mono border-l border-zinc-200 dark:border-zinc-800 pl-3">
+                <span className="text-lg font-bold text-zinc-900 dark:text-white">{customer.riskScore}/100</span>
+                <div className="text-[10px] text-zinc-400">Score</div>
+              </div>
             </div>
           </div>
 
@@ -249,8 +264,18 @@ export const CustomerRiskModal: React.FC<CustomerRiskModalProps> = ({
 
           {/* See Why Breakdown */}
           <div>
-            <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-2 font-semibold">
-              See Why: Built From Their Own History
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
+                See Why: Built From Their Own History
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExplainer(true)}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                <HelpCircle className="w-3 h-3 text-zinc-400" />
+                <span>How are risk scores calculated?</span>
+              </button>
             </div>
 
             {/* Historical metrics */}
@@ -315,6 +340,12 @@ export const CustomerRiskModal: React.FC<CustomerRiskModalProps> = ({
         </div>
 
       </div>
+
+      {/* Customer Risk Score Explainer Modal */}
+      <CustomerRiskExplainerModal
+        isOpen={showExplainer}
+        onClose={() => setShowExplainer(false)}
+      />
     </div>
   );
 };

@@ -9,7 +9,8 @@ import {
   PhoneCall, 
   Mail, 
   ChevronRight,
-  Lock
+  Lock,
+  HelpCircle
 } from 'lucide-react';
 import { 
   Invoice, 
@@ -20,6 +21,7 @@ import {
 } from '../types/dashboard';
 import { formatINR } from '../utils/formatters';
 import { CompanyAvatar } from './CompanyAvatar';
+import { CustomerRiskExplainerModal } from './CustomerRiskExplainerModal';
 
 interface LedgerTableBlockProps {
   invoices: Invoice[];
@@ -52,6 +54,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all');
   const [sortField, setSortField] = useState<'dueDate' | 'amount' | 'riskScore'>('dueDate');
   const [sortAsc, setSortAsc] = useState(false);
+  const [showRiskExplainer, setShowRiskExplainer] = useState(false);
 
   const activeInvoices = invoices.filter((i) => i.status !== 'paid' && i.currentStage !== 'Done');
   const settledInvoices = invoices.filter((i) => i.status === 'paid' || i.currentStage === 'Done');
@@ -242,6 +245,16 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
             </span>
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowRiskExplainer(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0D0E15] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+          title="See how customer risk score is calculated"
+        >
+          <HelpCircle className="w-3.5 h-3.5 text-zinc-400" />
+          <span>How are risk scores calculated?</span>
+        </button>
       </div>
 
       {/* Top Filter & Search Bar */}
@@ -338,7 +351,23 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                 <th className="py-3.5 px-4 font-semibold min-w-[140px]">Invoice Ref</th>
                 <th className="py-3.5 px-4 font-semibold text-right min-w-[130px]">Amount</th>
                 <th className="py-3.5 px-4 font-semibold min-w-[130px]">Ageing Bucket</th>
-                <th className="py-3.5 px-4 font-semibold min-w-[140px]">Risk Tier</th>
+                <th className="py-3.5 px-4 font-semibold min-w-[140px]">
+                  <div className="flex items-center gap-1.5">
+                    <span>Risk Tier</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowRiskExplainer(true);
+                      }}
+                      className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                      title="How are risk scores calculated?"
+                      aria-label="How are risk scores calculated?"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </th>
                 <th className="py-3.5 px-4 font-semibold min-w-[130px]">Status</th>
                 <th className="py-3.5 px-4 font-semibold min-w-[180px]">Last Outreach</th>
                 <th className="py-3.5 px-4 font-semibold text-right min-w-[140px]">Actions</th>
@@ -477,6 +506,12 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Customer Risk Score Calculation Explainer Modal */}
+      <CustomerRiskExplainerModal
+        isOpen={showRiskExplainer}
+        onClose={() => setShowRiskExplainer(false)}
+      />
     </section>
   );
 };

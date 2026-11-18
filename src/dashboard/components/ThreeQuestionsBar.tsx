@@ -80,7 +80,7 @@ export const ThreeQuestionsBar: React.FC<ThreeQuestionsBarProps> = ({
               </div>
             </div>
             <div className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-white font-mono tabular-nums">
-              {activeWorkflowsCount} <span className="text-base font-normal text-zinc-500 dark:text-zinc-400">Accounts</span>
+              {activeWorkflowsCount} <span className="text-base font-normal text-zinc-500 dark:text-zinc-400">{activeWorkflowsCount === 1 ? 'Account' : 'Accounts'}</span>
             </div>
           </div>
 

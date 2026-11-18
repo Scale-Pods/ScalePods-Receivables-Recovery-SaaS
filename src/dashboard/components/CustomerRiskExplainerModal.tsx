@@ -36,13 +36,10 @@ export const CustomerRiskExplainerModal: React.FC<CustomerRiskExplainerModalProp
             <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60 shrink-0">
               <HelpCircle className="w-4 h-4" />
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-white">
                 Customer Risk Score Engine
               </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
-                Autonomous Cadence Logic
-              </span>
             </div>
           </div>
 

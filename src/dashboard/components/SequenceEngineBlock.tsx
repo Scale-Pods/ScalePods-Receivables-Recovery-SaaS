@@ -540,9 +540,6 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
             <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">
               Sequence Engine Customizer
             </h2>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 font-semibold uppercase">
-              Cadence Engine
-            </span>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
             Customize cadence length, configure touchpoint days, and manage delivery channels.
@@ -656,9 +653,6 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider font-mono">
               Sequence Steps
-            </span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
-              {sequence.length} touchpoints configured
             </span>
           </div>
 

@@ -369,7 +369,9 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                   </div>
                 </th>
                 <th className="py-3.5 px-4 font-semibold min-w-[130px]">Status</th>
-                <th className="py-3.5 px-4 font-semibold min-w-[180px]">Last Outreach</th>
+                <th className="py-3.5 px-4 font-semibold min-w-[180px]">
+                  {viewTab === 'settled' ? 'Settlement / Payment Ref' : 'Last Outreach'}
+                </th>
                 <th className="py-3.5 px-4 font-semibold text-right min-w-[140px]">Actions</th>
               </tr>
             </thead>

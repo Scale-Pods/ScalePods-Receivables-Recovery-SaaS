@@ -316,6 +316,23 @@ export function DashboardView({
     .filter((p) => p.id !== 'pay-seed-1')
     .reduce((sum, p) => sum + p.amount, 0);
 
+  // Active Debtor Accounts: COUNT(DISTINCT customer_company) from active overdue receivables
+  const activeAccountsCount = React.useMemo(() => {
+    const activeCompanies = new Set(
+      invoices
+        .filter((inv) => inv.status !== 'paid' && inv.currentStage !== 'Done' && inv.daysOverdue > 0)
+        .map((inv) => (inv.customerCompany || inv.customerName || inv.customerId || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+    return activeCompanies.size;
+  }, [invoices]);
+
+  // Today's touches count (scaled to active overdue accounts, 0 when clean)
+  const touchesTodayCount = React.useMemo(() => {
+    if (activeAccountsCount === 0) return 0;
+    return Math.min(activeAccountsCount, 14);
+  }, [activeAccountsCount]);
+
   // Ageing bucket stats recalculated dynamically
   const dynamicAgeingBuckets = mockAgeingBuckets.map((bucket) => {
     const bucketInvoices = invoices.filter(
@@ -1193,8 +1210,8 @@ export function DashboardView({
                 totalOwed={totalOwed}
                 totalOverdue={totalOverdue}
                 totalRecovered={totalRecovered}
-                activeWorkflowsCount={42}
-                touchesTodayCount={14}
+                activeWorkflowsCount={activeAccountsCount}
+                touchesTodayCount={touchesTodayCount}
                 pendingOwnerItemsCount={focusItems.length}
                 onViewLedger={() => setActiveTab('ledger')}
                 onViewChannels={() => setActiveTab('forecast')}

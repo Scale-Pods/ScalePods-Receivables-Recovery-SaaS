@@ -10,6 +10,7 @@ import {
   Plus, 
   Moon, 
   Sun, 
+  Settings,
   CheckCircle2
 } from 'lucide-react';
 import { PlanTier, BusinessEntity } from '../types/dashboard';
@@ -233,19 +234,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {planTier}
             </span>
 
-            <button
-              onClick={() => setIsDark(!isDark)}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              title="Toggle theme"
-            >
-              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onOpenPlanSettings}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                title="Settings & Connected Mailbox"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => setIsDark(!isDark)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                title="Toggle theme"
+              >
+                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         ) : (
-          <div className="flex justify-center pt-1.5">
+          <div className="flex flex-col items-center gap-1.5 pt-1.5">
+            <button
+              onClick={onOpenPlanSettings}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
+              title="Settings & Connected Mailbox"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
             <button
               onClick={() => setIsDark(!isDark)}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
               title="Toggle theme"
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

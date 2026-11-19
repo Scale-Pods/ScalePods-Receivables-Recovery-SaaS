@@ -1,35 +1,29 @@
 import React, { useState } from 'react';
 import { 
   X, 
-  Sparkles, 
-  PhoneCall, 
-  SlidersHorizontal,
-  Clock,
-  ShieldCheck,
-  CheckCircle2,
-  Activity,
-  ArrowRight
+  SlidersHorizontal
 } from 'lucide-react';
 import { PlanTier } from '../types/dashboard';
 import { QuotaUsage } from '../utils/quota';
+import { EmailIntegrationCard } from './EmailIntegrationCard';
 
 interface PlanSettingsModalProps {
-  currentTier: PlanTier;
+  currentTier?: PlanTier;
   quota?: QuotaUsage;
   onOpenTopUp?: () => void;
   onOpenUpgrade?: () => void;
   onSelectTier?: (tier: PlanTier) => void;
   onClose: () => void;
+  customerUid?: string;
+  onToast?: (type: 'success' | 'warning' | 'info', title: string, message?: string) => void;
 }
 
 export const PlanSettingsModal: React.FC<PlanSettingsModalProps> = ({
-  currentTier,
-  quota,
-  onOpenTopUp,
-  onOpenUpgrade,
   onClose,
+  customerUid = 'local_user',
+  onToast,
 }) => {
-  const [activeTab, setActiveTab] = useState<'meters' | 'calling_hours' | 'safety'>('meters');
+  const [activeTab, setActiveTab] = useState<'mailbox' | 'calling_hours' | 'safety'>('mailbox');
 
   // Calling Hours State
   const [callStartHour, setCallStartHour] = useState('09:00');
@@ -48,10 +42,7 @@ export const PlanSettingsModal: React.FC<PlanSettingsModalProps> = ({
               <SlidersHorizontal className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Usage & Platform Details</h3>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
-                Active Tier: <span className="text-purple-600 dark:text-purple-400 font-semibold uppercase">{currentTier}</span> • Usage Quotas, Calling Rules & Consent (IST)
-              </p>
+              <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Platform Settings & Outreach Rules</h3>
             </div>
           </div>
 
@@ -60,10 +51,10 @@ export const PlanSettingsModal: React.FC<PlanSettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Navigation Tabs: 3 Remaining Tabs */}
-        <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#0A0B10] px-6 text-xs">
+        {/* Modal Navigation Tabs */}
+        <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#0A0B10] px-6 text-xs overflow-x-auto">
           {[
-            { id: 'meters', label: 'Usage Meters & Quotas' },
+            { id: 'mailbox', label: 'Connected Mailbox (Google Workspace)' },
             { id: 'calling_hours', label: 'Calling Hours (9am–7pm IST)' },
             { id: 'safety', label: 'Consent & Opt-Out Registry' },
           ].map((tab) => (
@@ -81,100 +72,17 @@ export const PlanSettingsModal: React.FC<PlanSettingsModalProps> = ({
           ))}
         </div>
 
-        {/* TAB 1: USAGE METERS */}
-        {activeTab === 'meters' && (
-          <div className="p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-1">Monthly Recovery Resource Quotas</h4>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Track invoice enrollment limits, voice call minutes, and automated touches for your active tier.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* Meter 1: Invoices entering recovery */}
-              <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#0E0F16] space-y-3">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-zinc-900 dark:text-white">Invoices Entering Recovery</span>
-                  <span className="font-mono text-purple-600 dark:text-purple-300 font-bold">
-                    {quota 
-                      ? `${quota.invoicesUsed} / ${quota.isCustom ? 'Custom' : quota.invoiceLimit} Used (${quota.invoicePercent}%)`
-                      : 'Active'}
-                  </span>
-                </div>
-                <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      quota?.isInvoiceLimitReached ? 'bg-rose-500' : (quota?.invoicePercent ?? 0) > 80 ? 'bg-amber-500' : 'bg-purple-500'
-                    }`}
-                    style={{ width: `${quota?.invoicePercent ?? 0}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
-                  <span>
-                    {quota?.isCustom 
-                      ? 'Enterprise unlimited quota' 
-                      : `${quota?.invoicesRemaining ?? 0} invoice slots remaining this month`}
-                  </span>
-                  {quota?.isInvoiceLimitReached && (
-                    <span className="text-rose-500 font-bold">Limit Reached</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Meter 2: AI Voice Calling Minutes */}
-              <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#0E0F16] space-y-3">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                    <PhoneCall className="w-3.5 h-3.5 text-purple-500" />
-                    AI Voice Call Minutes
-                  </span>
-                  <span className="font-mono text-purple-600 dark:text-purple-300 font-bold">
-                    {quota && quota.voiceMinutesLimit > 0
-                      ? `${quota.voiceMinutesUsed} / ${quota.isCustom ? 'Custom' : quota.voiceMinutesLimit} Mins (${quota.voicePercent}%)`
-                      : '0 Mins (Locked)'}
-                  </span>
-                </div>
-                <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${quota?.voicePercent ?? 0}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  {currentTier === 'free' || currentTier === 'basic'
-                    ? 'Voice calls are locked on Free & Basic. Upgrade to Growth (includes 90 mins/month).'
-                    : `${quota?.voiceMinutesRemaining ?? 0} mins remaining. Automated voice blitz triggers during Days 17–21.`}
-                </p>
-              </div>
-
-            </div>
-
-            {/* Quick Actions / Upgrade Notice */}
-            {onOpenUpgrade && currentTier !== 'enterprise' && (
-              <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/40 flex items-center justify-between text-xs">
-                <span className="text-zinc-600 dark:text-zinc-300">
-                  Need a higher permanent monthly recovery volume?
-                </span>
-                <button
-                  onClick={() => {
-                    onClose();
-                    onOpenUpgrade();
-                  }}
-                  className="font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
-                >
-                  <span>Explore Upgrades</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            )}
+        {/* TAB 1: CONNECTED MAILBOX (OAUTH 2.0) */}
+        {activeTab === 'mailbox' && (
+          <div className="p-6 space-y-4">
+            <EmailIntegrationCard
+              customerUid={customerUid}
+              onToast={onToast}
+            />
           </div>
         )}
 
-        {/* TAB 2: CALLING HOURS ENFORCEMENT */}
+        {/* TAB 3: CALLING HOURS ENFORCEMENT */}
         {activeTab === 'calling_hours' && (
           <div className="p-6 space-y-6">
             <div>

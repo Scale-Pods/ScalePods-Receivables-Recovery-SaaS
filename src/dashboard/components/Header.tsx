@@ -6,6 +6,7 @@ import {
   TrendingUp,
   CheckCircle2,
   Sparkles,
+  Settings,
   LogOut
 } from 'lucide-react';
 import { PlanTier, BusinessEntity } from '../types/dashboard';
@@ -68,8 +69,20 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         </h1>
       </div>
 
-      {/* Right Controls: Upgrade and Sign Out */}
+      {/* Right Controls: Settings, Upgrade, and Sign Out */}
       <div className="flex items-center gap-2 sm:gap-3">
+
+        {/* Settings Button (Opens Mailbox & Platform Settings) */}
+        {onOpenPlanSettings && (
+          <button
+            onClick={onOpenPlanSettings}
+            className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white bg-slate-100 hover:bg-slate-200/80 dark:bg-zinc-800/80 dark:hover:bg-zinc-800 border border-slate-200/80 dark:border-zinc-700/60 transition-colors cursor-pointer"
+            title="Settings & Integrations"
+          >
+            <Settings className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+            <span className="hidden sm:inline">Settings</span>
+          </button>
+        )}
 
         {/* Upgrade Button */}
         <button

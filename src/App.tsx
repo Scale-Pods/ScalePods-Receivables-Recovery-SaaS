@@ -12,6 +12,7 @@ import { UserAccount, PlanTierType, STORAGE_KEY_USER } from './types/auth';
 import { PricingPlan, pricingPlans } from './data/landingData';
 import { DashboardView } from './dashboard/App';
 import { signOutUser, updatePlanTierInSupabase, isSupabaseConfigured, supabase } from './lib/supabase';
+import { OAuthCallbackHandler } from './components/OAuthCallbackHandler';
 
 export function App() {
   // Theme state shared across Landing Page and Dashboard
@@ -34,8 +35,8 @@ export function App() {
     }
   }, [isDark]);
 
-  // Navigation View: 'landing' (marketing site) | 'dashboard' (Recovery SaaS core system)
-  const [activeView, setActiveView] = useState<'landing' | 'dashboard'>('landing');
+  // Navigation View: 'landing' (marketing site) | 'dashboard' (Recovery SaaS core system) | 'oauth-callback'
+  const [activeView, setActiveView] = useState<'landing' | 'dashboard' | 'oauth-callback'>('landing');
 
   // Auth state
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
@@ -94,7 +95,10 @@ export function App() {
       const path = window.location.pathname.toLowerCase();
       const hash = window.location.hash.toLowerCase();
 
-      if (path === '/upgrade' || hash === '#upgrade') {
+      if (path.startsWith('/auth/callback')) {
+        setActiveView('oauth-callback');
+        setIsPurchaseModalOpen(false);
+      } else if (path === '/upgrade' || hash === '#upgrade') {
         setIsPurchaseModalOpen(true);
         // If user session exists, show behind dashboard, else behind landing
         try {
@@ -201,6 +205,20 @@ export function App() {
       setActiveView('dashboard');
     }
   };
+
+  // OAuth Callback Route (/auth/callback/google)
+  if (activeView === 'oauth-callback') {
+    return (
+      <OAuthCallbackHandler
+        onComplete={() => {
+          setActiveView('dashboard');
+          if (window.location.pathname !== '/dashboard') {
+            window.history.pushState({ view: 'dashboard' }, '', '/dashboard');
+          }
+        }}
+      />
+    );
+  }
 
   // If user is logged in and viewing Dashboard, render full Recovery SaaS system
   if (activeView === 'dashboard') {

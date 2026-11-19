@@ -232,3 +232,30 @@ create policy "Users can manage own focus items"
 
 create index if not exists idx_focus_items_user on public.focus_items(user_id);
 
+-- 6.5 User Email Integrations (Approach B: OAuth 2.0 Google Workspace / Outlook)
+create table if not exists public.user_email_integrations (
+  id uuid primary key default gen_random_uuid(),
+  customer_uid text not null,
+  provider text not null default 'google',
+  connected_email text not null,
+  refresh_token text not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint user_email_integrations_customer_provider_key unique (customer_uid, provider)
+);
+
+alter table public.user_email_integrations enable row level security;
+
+create policy "Users can view own email integration"
+  on public.user_email_integrations for select
+  using (true);
+
+create policy "Users can manage own email integration"
+  on public.user_email_integrations for all
+  using (true)
+  with check (true);
+
+create index if not exists idx_user_email_integrations_customer on public.user_email_integrations(customer_uid);
+
+

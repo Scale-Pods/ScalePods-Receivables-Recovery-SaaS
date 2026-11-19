@@ -1420,6 +1420,8 @@ export function DashboardView({
         <PlanSettingsModal
           currentTier={planTier}
           quota={quota}
+          customerUid={currentUser?.customer_uid || currentUser?.id || 'local_user'}
+          onToast={addToast}
           onOpenTopUp={() => {
             setIsPlanSettingsOpen(false);
             setIsTopUpOpen(true);

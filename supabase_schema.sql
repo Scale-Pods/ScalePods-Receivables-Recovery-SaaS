@@ -262,4 +262,19 @@ create index if not exists idx_user_email_integrations_customer on public.user_e
 -- Adds connected_email to track the active outreach mailbox directly on the user's Credentials record
 alter table public."Credentials" add column if not exists connected_email text;
 
+-- 6.7 Consolidated Recovery Outreach Migration
+-- Consolidates tier-specific tables into a single recovery_outreach table:
+-- 1. Rename the active populated table to recovery_outreach:
+--    alter table public.recovery_outreach_enterprise rename to recovery_outreach;
+-- 2. Add plan_tier column with default 'free':
+--    alter table public.recovery_outreach add column if not exists plan_tier text not null default 'free';
+-- 3. Set existing records to 'enterprise':
+--    update public.recovery_outreach set plan_tier = 'enterprise';
+-- 4. Delete old empty tier tables:
+--    drop table if exists public.recovery_outreach_free;
+--    drop table if exists public.recovery_outreach_basic;
+--    drop table if exists public.recovery_outreach_growth;
+-- 5. Add index for fast querying by client and plan tier:
+--    create index if not exists idx_recovery_outreach_client on public.recovery_outreach(customer_uid, plan_tier);
+
 

@@ -194,7 +194,8 @@ export function App() {
         billingCycle: cycle,
       };
       setCurrentUser(updated);
-      await updatePlanTierInSupabase(currentUser.id || '', newTier, cycle);
+      const targetUserId = currentUser.customer_uid || currentUser.uid || currentUser.id || '';
+      await updatePlanTierInSupabase(targetUserId, newTier, cycle, currentUser.email, currentUser.customer_uid || currentUser.uid);
     }
   };
 

@@ -328,22 +328,89 @@ export async function signOutUser(): Promise<void> {
 export async function updatePlanTierInSupabase(
   userId: string,
   newTier: PlanTierType,
-  cycle: 'monthly' | 'annual'
+  cycle: 'monthly' | 'annual',
+  userEmail?: string,
+  customerUid?: string
 ): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     try {
-      // Update "Tier" in "Credentials" table
-      const numericId = Number(userId);
-      const query = supabase
-        .from('Credentials')
-        .update({
-          Tier: newTier,
-        });
+      // 1. Update "Tier" in "Credentials" table
+      // Uses Email matching first to prevent PostgreSQL "invalid input syntax for integer: UUID" errors
+      let credUpdated = false;
+      const cleanEmail = (userEmail || '').toLowerCase().trim();
 
-      if (!isNaN(numericId) && numericId > 0 && String(numericId) === String(userId)) {
-        await query.eq('id', numericId);
-      } else {
-        await query.or(`uid.eq.${userId},id.eq.${userId}`);
+      if (cleanEmail) {
+        // Try uppercase "Tier"
+        const attempt1 = await supabase
+          .from('Credentials')
+          .update({ Tier: newTier })
+          .ilike('Email', cleanEmail);
+        
+        if (!attempt1.error) {
+          credUpdated = true;
+        } else {
+          // Fallback to lowercase "tier"
+          const attempt2 = await supabase
+            .from('Credentials')
+            .update({ tier: newTier })
+            .ilike('Email', cleanEmail);
+          if (!attempt2.error) credUpdated = true;
+        }
+      }
+
+      // If not updated by Email, try matching by uid
+      const targetUid = customerUid || userId;
+      if (!credUpdated && targetUid && targetUid !== 'local_user') {
+        const attemptUid1 = await supabase
+          .from('Credentials')
+          .update({ Tier: newTier })
+          .eq('uid', targetUid);
+
+        if (!attemptUid1.error) {
+          credUpdated = true;
+        } else {
+          const attemptUid2 = await supabase
+            .from('Credentials')
+            .update({ tier: newTier })
+            .eq('uid', targetUid);
+          if (!attemptUid2.error) credUpdated = true;
+        }
+      }
+
+      // If still not updated, try matching by numeric id
+      const numericId = Number(userId);
+      if (!credUpdated && !isNaN(numericId) && numericId > 0) {
+        const attemptId1 = await supabase
+          .from('Credentials')
+          .update({ Tier: newTier })
+          .eq('id', numericId);
+
+        if (attemptId1.error) {
+          await supabase
+            .from('Credentials')
+            .update({ tier: newTier })
+            .eq('id', numericId);
+        }
+      }
+
+      // 2. Also sync plan_tier to all existing invoices in recovery_outreach table
+      // Matches by both customer_uid and customer_email to guarantee coverage
+      try {
+        if (targetUid && targetUid !== 'local_user') {
+          await supabase
+            .from('recovery_outreach')
+            .update({ plan_tier: newTier })
+            .eq('customer_uid', String(targetUid));
+        }
+
+        if (cleanEmail) {
+          await supabase
+            .from('recovery_outreach')
+            .update({ plan_tier: newTier })
+            .ilike('customer_email', cleanEmail);
+        }
+      } catch (err) {
+        console.warn('Notice updating plan_tier in recovery_outreach table:', err);
       }
     } catch (e) {
       console.warn('Failed to update Tier in Credentials table:', e);

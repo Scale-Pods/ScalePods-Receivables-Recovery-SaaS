@@ -354,6 +354,14 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       return;
     }
 
+    if (quota?.isInvoiceLimitReached) {
+      setUploadError(`Monthly quota of ${quota.invoiceLimit} invoices reached for ${planTier.toUpperCase()} tier. Please upgrade your plan to continue.`);
+      if (onUpgradePrompt) {
+        onUpgradePrompt(planTier === 'free' ? 'basic' : 'growth');
+      }
+      return;
+    }
+
     if (!uploadEmail.trim()) {
       setUploadError('Customer / Debtor Email is required.');
       return;
@@ -501,8 +509,10 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     if (!scannedResult) return;
 
     if (quota?.isInvoiceLimitReached) {
-      setUploadError(`Monthly quota of ${quota.invoiceLimit} invoices reached for ${planTier.toUpperCase()} tier. Please top up or upgrade to continue.`);
-      if (onOpenTopUp) onOpenTopUp();
+      setUploadError(`Monthly quota of ${quota.invoiceLimit} invoices reached for ${planTier.toUpperCase()} tier. Please upgrade your plan to continue.`);
+      if (onUpgradePrompt) {
+        onUpgradePrompt(planTier === 'free' ? 'basic' : 'growth');
+      }
       return;
     }
 
@@ -655,7 +665,10 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     if (!manualCompany || !manualInvoiceNo) return;
 
     if (quota?.isInvoiceLimitReached) {
-      if (onOpenTopUp) onOpenTopUp();
+      setUploadError(`Monthly quota of ${quota.invoiceLimit} invoices reached for ${planTier.toUpperCase()} tier. Please upgrade your plan to continue.`);
+      if (onUpgradePrompt) {
+        onUpgradePrompt(planTier === 'free' ? 'basic' : 'growth');
+      }
       return;
     }
     

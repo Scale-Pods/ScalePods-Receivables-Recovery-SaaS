@@ -13,21 +13,11 @@ import {
 } from '../dashboard/types/dashboard';
 
 // --------------------------------------------------------------------------
-// Tier Table Resolution Helper
+// Consolidated Recovery Outreach Table
 // --------------------------------------------------------------------------
-export function getRecoveryTableName(tier?: PlanTier | string): string {
-  const normalized = (tier || 'free').toLowerCase().trim();
-  switch (normalized) {
-    case 'basic':
-      return 'recovery_outreach_basic';
-    case 'growth':
-      return 'recovery_outreach_growth';
-    case 'enterprise':
-      return 'recovery_outreach_enterprise';
-    case 'free':
-    default:
-      return 'recovery_outreach_free';
-  }
+export function getRecoveryTableName(_tier?: PlanTier | string): string {
+  // Single consolidated recovery_outreach table for all tiers
+  return 'recovery_outreach';
 }
 
 const getInvoicesKey = (userId: string, tier: string, email?: string) => 
@@ -40,7 +30,7 @@ const getPaymentsKey = (userId: string, tier: string, email?: string) =>
   `recovr_db_payments_${(email || userId || 'guest').toLowerCase().trim()}_${tier}`;
 
 // --------------------------------------------------------------------------
-// Row <-> Model Adapters for recovery_outreach_* tables
+// Row <-> Model Adapters for recovery_outreach table
 // --------------------------------------------------------------------------
 
 export function recoveryRowToInvoice(row: any): Invoice {
@@ -314,6 +304,7 @@ export function invoiceToRecoveryRow(
     customer_uid: clientUid,
     customer_email: clientEmail,
     customer_name: clientName,
+    plan_tier: extraProps.plan_tier || 'free',
     ...extraProps,
   };
 }
@@ -493,11 +484,7 @@ export interface DashboardDataResult {
 }
 
 /**
- * Loads dashboard data for the given user from their tier-specific Supabase table:
- * - Free: recovery_outreach_free
- * - Basic: recovery_outreach_basic
- * - Growth: recovery_outreach_growth
- * - Enterprise: recovery_outreach_enterprise
+ * Loads dashboard data for the given user from the consolidated recovery_outreach Supabase table.
  */
 export async function loadDashboardData(
   userId: string,
@@ -615,6 +602,7 @@ export async function addInvoiceToDb(
         customer_uid: safeUserId !== 'local_user' ? safeUserId : null,
         customer_email: normalizedEmail || null,
         customer_name: userName || null,
+        plan_tier: planTier,
       });
       const { data, error } = await supabase.from(targetTable).insert([row]).select().single();
       if (error) {

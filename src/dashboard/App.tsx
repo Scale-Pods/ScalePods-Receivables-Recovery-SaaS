@@ -887,14 +887,16 @@ export function DashboardView({
 
   // Smart Intake: Add newly parsed or manual invoice
   const handleAddInvoice = (newInv: Partial<Invoice>) => {
-    // Check monthly quota before adding (Feature #13: Quota enforcement)
+    // Check monthly quota before adding (Quota enforcement)
     if (quota.isInvoiceLimitReached) {
       addToast(
         'warning', 
         'Monthly Intake Limit Reached', 
-        `You have reached your limit of ${quota.invoiceLimit} invoices on the ${planTier.toUpperCase()} plan. Upgrade or Top-Up to continue.`
+        `You have reached your limit of ${quota.invoiceLimit} invoices on the ${planTier.toUpperCase()} plan. Please upgrade your plan to continue adding invoices.`
       );
-      setIsTopUpOpen(true);
+      if (onOpenUpgrade) {
+        onOpenUpgrade();
+      }
       return;
     }
 

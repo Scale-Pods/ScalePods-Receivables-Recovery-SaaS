@@ -135,6 +135,34 @@ export async function exchangeGoogleAuthCode(params: {
           updated_at: new Date().toISOString(),
         };
         localStorage.setItem(`${STORAGE_KEY_PREFIX}${customerUid}`, JSON.stringify(integration));
+
+        // Update active user session in localStorage if current user
+        try {
+          const storedUserRaw = localStorage.getItem('recovr_user_account');
+          if (storedUserRaw) {
+            const storedUser = JSON.parse(storedUserRaw);
+            storedUser.connected_email = data.email;
+            localStorage.setItem('recovr_user_account', JSON.stringify(storedUser));
+          }
+        } catch {}
+
+        // Direct client sync to Credentials table if Supabase is configured
+        if (isSupabaseConfigured && supabase && customerUid && customerUid !== 'local_user') {
+          try {
+            const numericId = Number(customerUid);
+            const idVal = !isNaN(numericId) && numericId > 0 && String(numericId) === String(customerUid) ? numericId : customerUid;
+            const res1 = await supabase.from('Credentials').update({ connected_email: data.email }).eq('uid', customerUid);
+            if (res1.error) {
+              const res2 = await supabase.from('Credentials').update({ connected_email: data.email }).eq('id', idVal);
+              if (res2.error) {
+                await supabase.from('Credentials').update({ connected_email: data.email }).eq('customer_uid', customerUid);
+              }
+            }
+          } catch (e) {
+            console.warn('Notice updating Credentials table with connected_email:', e);
+          }
+        }
+
         return { success: true, email: data.email };
       }
     }
@@ -190,6 +218,19 @@ export async function exchangeGoogleAuthCode(params: {
             await supabase.from('user_email_integrations').upsert(rowPayload);
           }
         }
+
+        // Sync to Credentials table
+        if (customerUid && customerUid !== 'local_user') {
+          const numericId = Number(customerUid);
+          const idVal = !isNaN(numericId) && numericId > 0 && String(numericId) === String(customerUid) ? numericId : customerUid;
+          const res1 = await supabase.from('Credentials').update({ connected_email: connectedEmail }).eq('uid', customerUid);
+          if (res1.error) {
+            const res2 = await supabase.from('Credentials').update({ connected_email: connectedEmail }).eq('id', idVal);
+            if (res2.error) {
+              await supabase.from('Credentials').update({ connected_email: connectedEmail }).eq('customer_uid', customerUid);
+            }
+          }
+        }
       }
 
       // Cache locally
@@ -201,6 +242,15 @@ export async function exchangeGoogleAuthCode(params: {
         updated_at: new Date().toISOString(),
       };
       localStorage.setItem(`${STORAGE_KEY_PREFIX}${customerUid}`, JSON.stringify(integration));
+
+      try {
+        const storedUserRaw = localStorage.getItem('recovr_user_account');
+        if (storedUserRaw) {
+          const storedUser = JSON.parse(storedUserRaw);
+          storedUser.connected_email = connectedEmail;
+          localStorage.setItem('recovr_user_account', JSON.stringify(storedUser));
+        }
+      } catch {}
 
       return { success: true, email: connectedEmail };
     }
@@ -225,7 +275,29 @@ export async function disconnectEmailIntegration(customerUid: string): Promise<b
         .from('user_email_integrations')
         .update({ is_active: false, updated_at: new Date().toISOString() })
         .eq('customer_uid', customerUid);
+
+      if (customerUid && customerUid !== 'local_user') {
+        const numericId = Number(customerUid);
+        const idVal = !isNaN(numericId) && numericId > 0 && String(numericId) === String(customerUid) ? numericId : customerUid;
+        const res1 = await supabase.from('Credentials').update({ connected_email: null }).eq('uid', customerUid);
+        if (res1.error) {
+          const res2 = await supabase.from('Credentials').update({ connected_email: null }).eq('id', idVal);
+          if (res2.error) {
+            await supabase.from('Credentials').update({ connected_email: null }).eq('customer_uid', customerUid);
+          }
+        }
+      }
     }
+
+    try {
+      const storedUserRaw = localStorage.getItem('recovr_user_account');
+      if (storedUserRaw) {
+        const storedUser = JSON.parse(storedUserRaw);
+        storedUser.connected_email = undefined;
+        localStorage.setItem('recovr_user_account', JSON.stringify(storedUser));
+      }
+    } catch {}
+
     localStorage.removeItem(`${STORAGE_KEY_PREFIX}${customerUid}`);
     return true;
   } catch (err) {

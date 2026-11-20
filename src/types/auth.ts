@@ -7,6 +7,7 @@ export interface UserAccount {
   uid?: string;
   name: string;
   email: string;
+  connected_email?: string;
   companyName: string;
   companyLogo?: string; // Base64 image data URL
   planTier: PlanTierType;

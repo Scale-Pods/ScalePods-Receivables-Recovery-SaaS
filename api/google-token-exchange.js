@@ -92,6 +92,19 @@ export default async function handler(req, res) {
           await supabase.from('user_email_integrations').upsert(rowPayload);
         }
       }
+
+      // 4. Sync connected_email to "Credentials" table
+      if (customerUid && customerUid !== 'local_user') {
+        const numericId = Number(customerUid);
+        const idVal = !isNaN(numericId) && numericId > 0 && String(numericId) === String(customerUid) ? numericId : customerUid;
+        const credAttempt1 = await supabase.from('Credentials').update({ connected_email: email }).eq('uid', customerUid);
+        if (credAttempt1.error) {
+          const credAttempt2 = await supabase.from('Credentials').update({ connected_email: email }).eq('id', idVal);
+          if (credAttempt2.error) {
+            await supabase.from('Credentials').update({ connected_email: email }).eq('customer_uid', customerUid);
+          }
+        }
+      }
     }
 
     return res.status(200).json({

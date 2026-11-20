@@ -258,4 +258,8 @@ create policy "Users can manage own email integration"
 
 create index if not exists idx_user_email_integrations_customer on public.user_email_integrations(customer_uid);
 
+-- 6.6 Credentials Table Migration (Add connected_email column)
+-- Adds connected_email to track the active outreach mailbox directly on the user's Credentials record
+alter table public."Credentials" add column if not exists connected_email text;
+
 

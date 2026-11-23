@@ -86,23 +86,13 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scannedResult, setScannedResult] = useState<ParsedInvoicePreview | null>(null);
-  const [selectedSample, setSelectedSample] = useState<string | null>(null);
 
   // Real Non-Fabricating Invoice Reader & Field Extractor (All fields strictly extracted or nullable)
   const parseInvoiceFile = async (
     file: File | null,
     userEmail: string,
-    userPhone: string,
-    sampleMock?: ParsedInvoicePreview
+    userPhone: string
   ): Promise<ParsedInvoicePreview> => {
-    if (sampleMock) {
-      return {
-        ...sampleMock,
-        customerEmail: userEmail.trim() || sampleMock.customerEmail,
-        customerPhone: userPhone.trim() || sampleMock.customerPhone,
-      };
-    }
-
     if (!file) throw new Error("No file to parse");
 
     // Read raw buffer and extract decoded text strings (PDF text streams, CSV, text, XML)
@@ -279,7 +269,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   // Handle Real File Selection
   const handleFilePicked = (file: File) => {
     setSelectedFile(file);
-    setSelectedSample(null);
     setUploadedFileName(file.name);
     setUploadedFileSize(`${Math.max(1, Math.round(file.size / 1024))} KB`);
     setUploadError(null);
@@ -302,54 +291,11 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     }
   };
 
-  // Handle Quick Test Sample Selection
-  const handleSelectSample = (sample: typeof sampleFiles[0]) => {
-    setSelectedSample(sample.id);
-    setSelectedFile(null);
-    setUploadedFileName(sample.name);
-    setUploadedFileSize(sample.size);
-    setUploadEmail(sample.mockData.customerEmail);
-    setUploadPhone(sample.mockData.customerPhone);
-    setUploadError(null);
-    setIsScanning(true);
-    setScanProgress(30);
-    setScannedResult(null);
-
-    setTimeout(() => setScanProgress(75), 250);
-    setTimeout(() => {
-      setScanProgress(100);
-      setIsScanning(false);
-      setScannedResult(sample.mockData);
-
-      // Dispatch extracted invoice details to n8n webhook
-      sendInvoiceExtractionWebhook({
-        invoiceNumber: sample.mockData.invoiceNumber,
-        customerCompany: sample.mockData.customerCompany,
-        customerName: sample.mockData.customerName,
-        customerEmail: sample.mockData.customerEmail,
-        customerPhone: sample.mockData.customerPhone,
-        amount: sample.mockData.amount,
-        dueDate: sample.mockData.dueDate,
-        daysOverdue: sample.mockData.daysOverdue,
-        bucket: sample.mockData.bucket,
-        recommendedSequence: sample.mockData.recommendedSequence,
-        confidenceScore: sample.mockData.confidenceScore,
-        fileName: sample.name,
-        fileSize: sample.size,
-        userEmail: effectiveUserEmail,
-        userTier: effectiveUserTier,
-        userName: effectiveUserName,
-        userCompany: effectiveUserCompany,
-        timestamp: new Date().toISOString(),
-      });
-    }, 600);
-  };
-
   // Submit Invoice File for Extraction (Email & Phone are required fields)
   const handleProcessUpload = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    if (!selectedFile && !selectedSample) {
+    if (!selectedFile) {
       setUploadError('Please select or drop an invoice file to extract details.');
       return;
     }
@@ -406,7 +352,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       const n8nResult = await uploadInvoiceToN8nForExtraction({
         file: selectedFile,
         fileBase64,
-        fileName: uploadedFileName || selectedFile?.name || (selectedSample ? `${selectedSample}.pdf` : 'invoice.pdf'),
+        fileName: uploadedFileName || selectedFile?.name || 'invoice.pdf',
         fileSize: uploadedFileSize || (selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : null),
         fileType: selectedFile?.type || 'application/pdf',
         fileSizeBytes: selectedFile?.size,
@@ -423,18 +369,9 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
 
       setScanProgress(85);
 
-      const sampleMock = selectedSample ? sampleFiles.find(s => s.id === selectedSample)?.mockData : undefined;
       let parsed: ParsedInvoicePreview;
 
-      if (selectedSample && sampleMock) {
-        // Preset sample test data
-        parsed = {
-          ...sampleMock,
-          customerEmail: uploadEmail.trim() || sampleMock.customerEmail,
-          customerPhone: uploadPhone.trim() || sampleMock.customerPhone,
-          isN8nExtracted: false,
-        };
-      } else if (n8nResult.isN8nSuccess && (n8nResult.invoiceNumber || n8nResult.amount !== null)) {
+      if (n8nResult.isN8nSuccess && (n8nResult.invoiceNumber || n8nResult.amount !== null)) {
         // Real AI Extraction output returned synchronously by n8n
         const daysOverdue = n8nResult.dueDate 
           ? Math.max(0, Math.floor((Date.now() - new Date(n8nResult.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
@@ -558,7 +495,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     });
 
     setScannedResult(null);
-    setSelectedSample(null);
     setSelectedFile(null);
     setUploadedFileName(null);
     setUploadedFileSize(null);
@@ -578,78 +514,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   const [manualPhone, setManualPhone] = useState('');
   const [manualAmount, setManualAmount] = useState<number>(50000);
   const [manualDueDate, setManualDueDate] = useState('2024-10-15');
-
-  const sampleFiles = [
-    {
-      id: 'sample-1',
-      name: 'Nexora_Infotech_INV-8842.pdf',
-      type: 'pdf',
-      size: '245 KB',
-      mockData: {
-        invoiceNumber: 'INV-2024-8842',
-        customerCompany: 'Nexora Infotech Pvt Ltd',
-        customerName: 'Rajesh Sharma',
-        customerEmail: 'r.sharma@nexorainfotech.in',
-        customerPhone: '+91 98201 44821',
-        amount: 184000,
-        currency: '₹',
-        issueDate: '2024-09-15',
-        dueDate: '2024-10-15',
-        daysOverdue: 20,
-        bucket: '15+' as const,
-        recommendedSequence: 'standard' as const,
-        isDuplicate: false,
-        orderReference: 'GST-PO-9842-IN',
-        confidenceScore: 99.4,
-      }
-    },
-    {
-      id: 'sample-2',
-      name: 'Vanguard_Systems_India_Bill.png',
-      type: 'image',
-      size: '1.2 MB',
-      mockData: {
-        invoiceNumber: 'INV-2024-9102',
-        customerCompany: 'Vanguard Systems India Pvt Ltd',
-        customerName: 'Priya Sundaram',
-        customerEmail: 'priya@vanguardindia.in',
-        customerPhone: '+91 98450 12390',
-        amount: 325000,
-        currency: '₹',
-        issueDate: '2024-08-10',
-        dueDate: '2024-09-09',
-        daysOverdue: 56,
-        bucket: '30+' as const,
-        recommendedSequence: 'intensive' as const,
-        isDuplicate: false,
-        orderReference: 'PO-VANGUARD-BLR',
-        confidenceScore: 98.7,
-      }
-    },
-    {
-      id: 'sample-3',
-      name: 'Apex_Cloud_Solutions_GST.xlsx',
-      type: 'spreadsheet',
-      size: '84 KB',
-      mockData: {
-        invoiceNumber: 'INV-2024-4412',
-        customerCompany: 'Apex Cloud Platforms Pvt Ltd',
-        customerName: 'Kavita Patel',
-        customerEmail: 'accounts@apexcloud.co.in',
-        customerPhone: '+91 98800 77123',
-        amount: 68000,
-        currency: '₹',
-        issueDate: '2024-10-25',
-        dueDate: '2024-11-01',
-        daysOverdue: 3,
-        bucket: 'early' as const,
-        recommendedSequence: 'light' as const,
-        isDuplicate: false,
-        orderReference: 'GSTIN-29AAACA1234F',
-        confidenceScore: 99.8,
-      }
-    }
-  ];
 
   const getManualBucket = (dueDateStr: string): 'early' | '15+' | '30+' | '60+' => {
     const due = new Date(dueDateStr).getTime();
@@ -878,7 +742,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                   />
 
                   {/* Dropzone / Selected File Card */}
-                  {!selectedFile && !selectedSample ? (
+                  {!selectedFile ? (
                     <div
                       onClick={() => fileInputRef.current?.click()}
                       onDragOver={(e) => {
@@ -930,7 +794,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                         type="button"
                         onClick={() => {
                           setSelectedFile(null);
-                          setSelectedSample(null);
                           setUploadedFileName(null);
                           setUploadedFileSize(null);
                           if (fileInputRef.current) fileInputRef.current.value = '';
@@ -963,43 +826,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                   )}
                 </button>
               </form>
-
-              {/* Sample Presets */}
-              <div className="space-y-1.5 pt-2 border-t border-zinc-200 dark:border-zinc-800/80">
-                <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">Or pick a quick test sample:</div>
-                <div className="space-y-1.5">
-                  {sampleFiles.map((sample) => {
-                    const isSelected = selectedSample === sample.id;
-                    return (
-                      <div
-                        key={sample.id}
-                        onClick={() => handleSelectSample(sample)}
-                        className={`p-2.5 rounded-lg border flex items-center justify-between cursor-pointer transition-all ${
-                          isSelected
-                            ? 'border-purple-600 dark:border-purple-400 bg-purple-50/20 dark:bg-purple-950/20 shadow-sm'
-                            : 'border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-[#0E0F16] hover:border-zinc-300 dark:hover:border-zinc-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300">
-                            {sample.type === 'pdf' ? <FileText className="w-3.5 h-3.5" /> : sample.type === 'image' ? <ImageIcon className="w-3.5 h-3.5" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                          </div>
-                          <div>
-                            <div className="text-xs font-semibold text-zinc-900 dark:text-white">{sample.name}</div>
-                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
-                              {formatINR(sample.mockData.amount)} • {sample.mockData.customerEmail}
-                            </div>
-                          </div>
-                        </div>
-
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold">
-                          Load
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
           </div>
 
@@ -1016,14 +842,10 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                     <span className={`px-2 py-0.5 rounded text-[10px] font-mono border font-semibold ${
                       scannedResult.isN8nExtracted
                         ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
-                        : selectedSample
-                        ? 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20'
                         : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
                     }`}>
                       {scannedResult.isN8nExtracted
                         ? `${scannedResult.confidenceScore}% AI Confidence`
-                        : selectedSample
-                        ? 'Sample Preset'
                         : 'Awaiting n8n Output'}
                     </span>
                   )}
@@ -1049,29 +871,21 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                     <div className={`p-2.5 rounded-lg border flex items-center justify-between text-xs ${
                       scannedResult.isN8nExtracted
                         ? 'bg-emerald-500/10 border-emerald-500/20'
-                        : selectedSample
-                        ? 'bg-purple-500/10 border-purple-500/20'
                         : 'bg-zinc-100 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800'
                     }`}>
                       <div className="flex items-center gap-1.5 font-medium">
                         <CheckCircle2 className={`w-3.5 h-3.5 ${
                           scannedResult.isN8nExtracted 
                             ? 'text-emerald-600 dark:text-emerald-400' 
-                            : selectedSample
-                            ? 'text-purple-600 dark:text-purple-400'
                             : 'text-zinc-400'
                         }`} />
                         <span className={
                           scannedResult.isN8nExtracted 
                             ? 'text-emerald-700 dark:text-emerald-300' 
-                            : selectedSample
-                            ? 'text-purple-700 dark:text-purple-300'
                             : 'text-zinc-600 dark:text-zinc-400'
                         }>
                           {scannedResult.isN8nExtracted 
                             ? 'n8n AI Vision Extraction' 
-                            : selectedSample
-                            ? 'Sample Test File'
                             : 'File Sent to n8n Webhook • Awaiting AI Output'}
                         </span>
                       </div>

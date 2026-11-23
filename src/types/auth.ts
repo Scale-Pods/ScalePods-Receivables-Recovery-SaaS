@@ -1,5 +1,5 @@
 export type PlanTierType = 'free' | 'basic' | 'growth' | 'enterprise';
-export type UserRole = 'client' | 'developer';
+export type UserRole = 'client' | 'developer' | 'owner';
 
 export interface UserAccount {
   id?: string;
@@ -13,6 +13,8 @@ export interface UserAccount {
   planTier: PlanTierType;
   billingCycle: 'monthly' | 'annual';
   role?: UserRole;
+  isOwner?: boolean;
+  domain?: string;
   createdAt: string;
 }
 

@@ -277,4 +277,97 @@ alter table public."Credentials" add column if not exists connected_email text;
 -- 5. Add index for fast querying by client and plan tier:
 --    create index if not exists idx_recovery_outreach_client on public.recovery_outreach(customer_uid, plan_tier);
 
+-- 6.8 Domain Seat Quota & Subdomain Abuse Prevention Trigger
+-- Atomically prevents race conditions when concurrent users sign up under the same corporate domain.
+-- Matrix: Free (3), Basic (3), Growth (5), Enterprise (10 accounts).
+CREATE OR REPLACE FUNCTION public.check_domain_seat_quota()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    raw_domain text;
+    root_domain text;
+    domain_count int;
+    highest_tier text := 'free';
+    max_seats int := 3;
+    tier_rank int;
+BEGIN
+    -- Extract domain from email (e.g. alice@sales.acme.com -> sales.acme.com)
+    raw_domain := lower(split_part(NEW."Email", '@', 2));
+
+    -- Handle multi-part ccSLDs (.co.in, .com.au, .co.uk) vs standard TLDs to prevent subdomain abuse
+    IF raw_domain LIKE '%.co.in' OR raw_domain LIKE '%.com.au' OR raw_domain LIKE '%.co.uk' OR raw_domain LIKE '%.org.in' THEN
+        root_domain := substring(raw_domain from '([^.]+\.[^.]+\.[^.]+)$');
+    ELSE
+        root_domain := substring(raw_domain from '([^.]+\.[^.]+)$');
+    END IF;
+
+    IF root_domain IS NULL OR root_domain = '' THEN
+        root_domain := raw_domain;
+    END IF;
+
+    -- Count existing accounts under root domain and find highest active tier
+    SELECT 
+        count(*),
+        coalesce(max(
+            CASE 
+                WHEN lower(coalesce("Tier", 'free')) = 'enterprise' THEN 4
+                WHEN lower(coalesce("Tier", 'free')) = 'growth' THEN 3
+                WHEN lower(coalesce("Tier", 'free')) = 'basic' THEN 2
+                ELSE 1
+            END
+        ), 1)
+    INTO domain_count, tier_rank
+    FROM public."Credentials"
+    WHERE lower("Email") LIKE '%@' || root_domain 
+       OR lower("Email") LIKE '%.%' || root_domain;
+
+    -- Map rank to tier name and seat limits
+    IF tier_rank = 4 THEN
+        highest_tier := 'enterprise';
+        max_seats := 10;
+    ELSIF tier_rank = 3 THEN
+        highest_tier := 'growth';
+        max_seats := 5;
+    ELSIF tier_rank = 2 THEN
+        highest_tier := 'basic';
+        max_seats := 3;
+    ELSE
+        highest_tier := 'free';
+        max_seats := 3;
+    END IF;
+
+    -- Atomically block transaction if company quota limit is reached
+    IF domain_count >= max_seats THEN
+        RAISE EXCEPTION 'Your organization (%) has reached its limit of % accounts on the % plan. To add more team members, an existing team member must upgrade your company workspace to Growth (5 accounts) or Enterprise (10 accounts).',
+            root_domain, max_seats, upper(highest_tier);
+    END IF;
+
+    -- Automatically inherit organization's active tier
+    IF NEW."Tier" IS NULL OR lower(NEW."Tier") = 'free' THEN
+        NEW."Tier" := highest_tier;
+    END IF;
+
+    -- Mark account #1 as owner if no previous account existed for this domain
+    IF domain_count = 0 THEN
+        BEGIN
+            NEW."Role" := 'owner';
+        EXCEPTION WHEN undefined_column THEN
+            -- Role column is optional in Credentials
+            NULL;
+        END;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_domain_seat_quota ON public."Credentials";
+CREATE TRIGGER trg_enforce_domain_seat_quota
+BEFORE INSERT ON public."Credentials"
+FOR EACH ROW
+EXECUTE FUNCTION public.check_domain_seat_quota();
+
+
 

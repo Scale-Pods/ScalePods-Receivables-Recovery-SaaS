@@ -16,6 +16,7 @@ import {
 import confetti from 'canvas-confetti';
 import { UserAccount, PlanTierType, STORAGE_KEY_ROLE } from '../types/auth';
 import { signUpUser, signInUser, isSupabaseConfigured } from '../lib/supabase';
+import { validateWorkEmail } from '../lib/workEmailValidator';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -42,6 +43,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [companyLogo, setCompanyLogo] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Live Work Email Validation feedback (for sign up mode)
+  const workEmailFeedback = React.useMemo(() => {
+    if (mode !== 'signup' || !email.includes('@')) return null;
+    return validateWorkEmail(email);
+  }, [mode, email]);
 
   // Reset or initialize on open
   React.useEffect(() => {
@@ -86,6 +93,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (mode === 'signup') {
       if (!name.trim() || !email.trim() || !password || !companyName.trim()) {
         setErrorMsg('Please fill in all required fields.');
+        return;
+      }
+      // Phase 1: Work Email Validation check
+      const emailVal = validateWorkEmail(email);
+      if (!emailVal.isValid) {
+        setErrorMsg(emailVal.error || "Please sign up using your company's work email address.");
         return;
       }
       if (!companyLogo) {
@@ -326,9 +339,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 placeholder="marcus@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                className={`w-full pl-9 pr-3 py-2 rounded-xl bg-zinc-900 border text-xs text-white placeholder-zinc-500 focus:outline-none transition-all ${
+                  mode === 'signup' && email.includes('@') && workEmailFeedback && !workEmailFeedback.isValid
+                    ? 'border-rose-500/80 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                    : mode === 'signup' && email.includes('@') && workEmailFeedback?.isValid
+                    ? 'border-emerald-500/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+                    : 'border-zinc-800 focus:border-purple-500 focus:ring-1 focus:ring-purple-500'
+                }`}
               />
             </div>
+            {mode === 'signup' && email.includes('@') && workEmailFeedback && (
+              <div className="mt-1.5 transition-all">
+                {!workEmailFeedback.isValid ? (
+                  <p className="text-[11px] text-rose-400 flex items-start gap-1 font-medium leading-tight">
+                    <span className="shrink-0">⚠️</span>
+                    <span>{workEmailFeedback.error}</span>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium">
+                    <span>✓</span>
+                    <span>Corporate domain: @{workEmailFeedback.domain}</span>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Password */}

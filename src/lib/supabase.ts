@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { UserAccount, PlanTierType, UserRole, STORAGE_KEY_USER, STORAGE_KEY_USERS_DB } from '../types/auth';
 import { hashPassword, verifyPassword } from './security';
+import { validateWorkEmail, getTierSeatLimit, getHighestTier } from './workEmailValidator';
 
 // 1. Read Supabase credentials from Vite environment variables (.env)
 // Supports both VITE_ prefixed and standard SUPABASE_ prefixed variables
@@ -56,6 +57,14 @@ export async function signUpUser(params: {
   const { email, password, fullName, companyName, companyLogo, role = 'client' } = params;
   const normalizedEmail = email.trim().toLowerCase();
 
+  // Phase 1: Work Email Validation (Filtering Out Personal / Disposable Emails)
+  const emailValidation = validateWorkEmail(normalizedEmail);
+  if (!emailValidation.isValid) {
+    return { account: null, error: emailValidation.error || 'Please use a corporate work email address.' };
+  }
+  const domain = emailValidation.domain;
+  const rootDomain = emailValidation.rootDomain || domain;
+
   if (!companyLogo || !companyLogo.trim()) {
     return { account: null, error: 'Company logo is required to create an account.' };
   }
@@ -77,18 +86,54 @@ export async function signUpUser(params: {
         return { account: null, error: 'An account with this email already exists. Please log in.' };
       }
 
+      // Phase 2: Domain-Level Seat Quota Enforcement
+      // Checks across rootDomain to prevent subdomain bypass abuse (e.g. sales.acme.com vs eng.acme.com)
+      let assignedTier: PlanTierType = 'free';
+      let isOrgOwner = true;
+
+      const { data: domainAccounts, error: domainCheckError } = await supabase
+        .from('Credentials')
+        .select('id, Tier, tier, Email')
+        .or(`Email.ilike.%@${rootDomain},Email.ilike.%.${rootDomain}`);
+
+      if (domainCheckError) {
+        console.warn('Domain quota check notice:', domainCheckError);
+      }
+
+      if (domainAccounts && domainAccounts.length > 0) {
+        isOrgOwner = false; // Existing account(s) exist; this user is a team member
+        // Find highest active tier across company domain accounts
+        let highestTier = 'free';
+        for (const acct of domainAccounts) {
+          const t = (acct.Tier || acct.tier || 'free').toLowerCase();
+          highestTier = getHighestTier(highestTier, t);
+        }
+        const maxSeats = getTierSeatLimit(highestTier);
+
+        if (domainAccounts.length >= maxSeats) {
+          return {
+            account: null,
+            error: `Your organization (${rootDomain}) has reached its limit of ${maxSeats} accounts on the ${highestTier.toUpperCase()} plan. To add more team members, an existing team member must upgrade your company workspace to Growth (5 accounts) or Enterprise (10 accounts).`,
+          };
+        }
+
+        // Automatically inherit company's upgraded workspace tier
+        assignedTier = highestTier as PlanTierType;
+      }
+
       // 2. Cryptographically hash password before storing in Supabase
       const hashedPassword = await hashPassword(password);
 
-      // 3. Insert new user into "Credentials"
+      // 3. Insert new user into "Credentials" (Account #1 is marked owner, subsequent users are team members)
+      const initialRole: UserRole = isOrgOwner ? 'owner' : (role || 'client');
       const insertPayload: Record<string, any> = {
         Name: fullName,
         Email: normalizedEmail,
         Password: hashedPassword,
-        Tier: 'free',
+        Tier: assignedTier,
         companyName: companyName,
         companyLogo: companyLogo || null,
-        Role: 'client',
+        Role: initialRole,
       };
 
       let createdRow: any = null;
@@ -128,7 +173,7 @@ export async function signUpUser(params: {
       const rawRole = (createdRow.Role ?? createdRow.role)
         ? String(createdRow.Role ?? createdRow.role).trim().toLowerCase()
         : null;
-      const assignedRole: UserRole = rawRole === 'developer' ? 'developer' : 'client';
+      const assignedRole: UserRole = rawRole === 'developer' ? 'developer' : rawRole === 'owner' ? 'owner' : isOrgOwner ? 'owner' : 'client';
 
       const customerUid = (createdRow.customer_uid ?? createdRow.uid)
         ? String(createdRow.customer_uid ?? createdRow.uid)
@@ -146,6 +191,8 @@ export async function signUpUser(params: {
         planTier: (createdRow.Tier?.toLowerCase() || 'free') as PlanTierType,
         billingCycle: 'monthly',
         role: assignedRole,
+        isOwner: isOrgOwner || assignedRole === 'owner',
+        domain: rootDomain,
         createdAt: createdRow.created_at || new Date().toISOString(),
       };
 
@@ -166,7 +213,33 @@ export async function signUpUser(params: {
       return { account: null, error: 'An account with this work email already exists. Please log in.' };
     }
 
-    const assignedRole: UserRole = 'client';
+    // Phase 2: Domain-Level Seat Quota in Local Storage (matches across root domain)
+    const domainAccounts = usersDb.filter((u: any) => {
+      const e = (u.email || '').toLowerCase();
+      return e.endsWith(`@${rootDomain}`) || e.includes(`.${rootDomain}`);
+    });
+    let assignedTier: PlanTierType = 'free';
+    const isOrgOwner = domainAccounts.length === 0;
+
+    if (domainAccounts.length > 0) {
+      let highestTier = 'free';
+      for (const acct of domainAccounts) {
+        const t = (acct.planTier || acct.Tier || acct.tier || 'free').toLowerCase();
+        highestTier = getHighestTier(highestTier, t);
+      }
+      const maxSeats = getTierSeatLimit(highestTier);
+
+      if (domainAccounts.length >= maxSeats) {
+        return {
+          account: null,
+          error: `Your organization (${rootDomain}) has reached its limit of ${maxSeats} accounts on the ${highestTier.toUpperCase()} plan. To add more team members, an existing team member must upgrade your company workspace to Growth (5 accounts) or Enterprise (10 accounts).`,
+        };
+      }
+
+      assignedTier = highestTier as PlanTierType;
+    }
+
+    const assignedRole: UserRole = isOrgOwner ? 'owner' : (role || 'client');
 
     const newAccount: UserAccount = {
       id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -174,9 +247,11 @@ export async function signUpUser(params: {
       name: fullName,
       companyName,
       companyLogo: companyLogo || undefined,
-      planTier: 'free',
+      planTier: assignedTier,
       billingCycle: 'monthly',
       role: assignedRole,
+      isOwner: isOrgOwner,
+      domain: rootDomain,
       createdAt: new Date().toISOString(),
     };
 

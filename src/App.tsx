@@ -11,6 +11,7 @@ import { TierPurchaseModal } from './components/TierPurchaseModal';
 import { UserAccount, PlanTierType, STORAGE_KEY_USER } from './types/auth';
 import { PricingPlan, pricingPlans } from './data/landingData';
 import { DashboardView } from './dashboard/App';
+import { isDashboardPath } from './dashboard/routes';
 import { signOutUser, updatePlanTierInSupabase, isSupabaseConfigured, supabase } from './lib/supabase';
 import { OAuthCallbackHandler } from './components/OAuthCallbackHandler';
 
@@ -89,7 +90,7 @@ export function App() {
     }
   }, []);
 
-  // Synchronize route with URL (supports /upgrade, /dashboard, and /)
+  // Synchronize route with URL (supports /upgrade, dashboard page routes, and /)
   useEffect(() => {
     const syncRouteFromUrl = () => {
       const path = window.location.pathname.toLowerCase();
@@ -107,7 +108,7 @@ export function App() {
             setActiveView('dashboard');
           }
         } catch {}
-      } else if (path === '/dashboard') {
+      } else if (isDashboardPath(path)) {
         setActiveView('dashboard');
         setIsPurchaseModalOpen(false);
       } else {
@@ -139,7 +140,7 @@ export function App() {
   const handleAuthSuccess = (account: UserAccount) => {
     setCurrentUser(account);
     setActiveView('dashboard');
-    if (window.location.pathname !== '/dashboard' && window.location.pathname !== '/upgrade') {
+    if (!isDashboardPath(window.location.pathname) && window.location.pathname !== '/upgrade') {
       window.history.pushState({ view: 'dashboard' }, '', '/dashboard');
     }
   };
@@ -174,7 +175,7 @@ export function App() {
 
   const handleSwitchToDashboard = () => {
     setActiveView('dashboard');
-    if (window.location.pathname !== '/dashboard') {
+    if (!isDashboardPath(window.location.pathname)) {
       window.history.pushState({ view: 'dashboard' }, '', '/dashboard');
     }
   };

@@ -193,6 +193,16 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
     );
   };
 
+  const formatLedgerDate = (value?: string | null) => {
+    if (!value) return '—';
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+    if (!match) return value;
+    const [, y, m, d] = match;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+  };
+
   const getChannelIcon = (ch: Invoice['lastTouch']['channel']) => {
     switch (ch) {
       case 'whatsapp':
@@ -352,6 +362,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
               <tr className="border-b border-slate-200 dark:border-zinc-800 bg-slate-50/90 dark:bg-[#12131C] text-slate-700 dark:text-zinc-400 font-mono text-xs uppercase tracking-wider divide-x divide-slate-200 dark:divide-zinc-800/80">
                 <th className="py-3.5 px-4 font-semibold min-w-[220px]">Customer / Company</th>
                 <th className="py-3.5 px-4 font-semibold min-w-[140px]">Invoice Ref</th>
+                <th className="py-3.5 px-4 font-semibold min-w-[120px]">Due Date</th>
                 <th className="py-3.5 px-4 font-semibold text-right min-w-[130px]">Amount</th>
                 <th className="py-3.5 px-4 font-semibold min-w-[130px]">Ageing Bucket</th>
                 <th className="py-3.5 px-4 font-semibold min-w-[140px]">
@@ -381,7 +392,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60 text-sm">
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-zinc-500 text-sm">
+                  <td colSpan={9} className="py-12 text-center text-zinc-500 text-sm">
                     {viewTab === 'settled'
                       ? 'No settled payments found in this filter.'
                       : 'No active overdue invoices found in this view.'}
@@ -416,6 +427,13 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                       <td className="py-3.5 px-4 font-mono">
                         <span className="font-semibold text-zinc-800 dark:text-zinc-200 text-sm">
                           {inv.invoiceNumber}
+                        </span>
+                      </td>
+
+                      {/* Due Date */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
+                          {formatLedgerDate(inv.dueDate)}
                         </span>
                       </td>
 

@@ -60,6 +60,7 @@ import { formatINR } from './utils/formatters';
 import { UserAccount } from '../types/auth';
 import { type InvoiceApprovalResult } from '../lib/invoiceWorkflow';
 import { buildQuotaMap, fetchPlanLimits, type DynamicPlanQuota } from '../lib/planLimits';
+import { TAB_ROUTES, tabFromPath } from './routes';
 
 export interface DashboardViewProps {
   currentUser?: UserAccount | null;
@@ -99,8 +100,27 @@ export function DashboardView({
     } catch {}
   };
 
-  // Active Tab: 'overview' | 'ledger' | 'intake' | 'sequence' | 'simulator' | 'day22' | 'channels' | 'forecast'
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  // Active Tab: 'overview' | 'focus' | 'ledger' | 'intake' | 'sequence' | 'forecast'
+  // Flat deep links like /ledger open straight into the matching tab.
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() =>
+    typeof window === 'undefined' ? 'overview' : tabFromPath(window.location.pathname)
+  );
+
+  const navigateToTab = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    if (typeof window === 'undefined') return;
+    const route = TAB_ROUTES[tab];
+    if (tabFromPath(window.location.pathname) !== tab) {
+      window.history.pushState({ view: 'dashboard', tab }, '', route);
+    }
+  };
+
+  // Browser back/forward should switch tabs too.
+  useEffect(() => {
+    const syncTabFromUrl = () => setActiveTab(tabFromPath(window.location.pathname));
+    window.addEventListener('popstate', syncTabFromUrl);
+    return () => window.removeEventListener('popstate', syncTabFromUrl);
+  }, []);
 
   // Plan Tier simulator (Free, Basic, Growth, Enterprise) — syncs with user account
   const [planTier, setPlanTier] = useState<PlanTier>(
@@ -1025,7 +1045,7 @@ export function DashboardView({
       `Saved to Database: ${fullInvoice.invoiceNumber}`, 
       `${fullInvoice.customerCompany} entered ${fullInvoice.bucket.toUpperCase()} bucket. Persisted in database.`
     );
-    setActiveTab('ledger');
+    navigateToTab('ledger');
   };
 
   // Approval path: the server has already generated dates and inserted the row.
@@ -1122,7 +1142,7 @@ export function DashboardView({
         ? `${result.next_action || 'Recovery sequence'} scheduled for ${result.next_action_date}.`
         : 'Dates generated from your saved sequence.'
     );
-    setActiveTab('ledger');
+    navigateToTab('ledger');
   };
 
   // Customer Portal: Payment simulation
@@ -1303,7 +1323,7 @@ export function DashboardView({
       {/* Left Sidebar Navigation (Replaces overcrowded horizontal navbar) */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={navigateToTab}
         planTier={planTier}
         setPlanTier={setPlanTier}
         isDark={isDark}
@@ -1361,9 +1381,9 @@ export function DashboardView({
                 pendingOwnerItemsCount={focusItems.length}
                 invoices={invoices}
                 payments={payments}
-                onViewLedger={() => setActiveTab('ledger')}
-                onViewChannels={() => setActiveTab('forecast')}
-                onScrollToFocus={() => setActiveTab('focus')}
+                onViewLedger={() => navigateToTab('ledger')}
+                onViewChannels={() => navigateToTab('forecast')}
+                onScrollToFocus={() => navigateToTab('focus')}
               />
 
               {/* Distribution-only due-date and settlement intelligence */}
@@ -1478,7 +1498,7 @@ export function DashboardView({
                 onUpgradePrompt={() => handleUpgradePrompt('basic')}
                 onFilterByStage={() => {
                   setSelectedBucket('all');
-                  setActiveTab('overview');
+                  navigateToTab('overview');
                 }}
               />
             </div>

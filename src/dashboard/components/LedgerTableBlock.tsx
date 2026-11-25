@@ -141,7 +141,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
           onInspectRisk(inv);
         }}
         className="inline-flex items-center gap-1.5 cursor-pointer"
-        title={`Score: ${inv.riskScore} (${label}) - Click to inspect risk`}
+        title={inv.riskReason ? `Score: ${inv.riskScore} (${label})\nReason: ${inv.riskReason}` : `Score: ${inv.riskScore} (${label}) - Click to inspect risk`}
       >
         <span className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-md border ${colorClass} flex items-center gap-1 hover:opacity-80 transition-opacity`}>
           <span>{inv.riskScore}</span>

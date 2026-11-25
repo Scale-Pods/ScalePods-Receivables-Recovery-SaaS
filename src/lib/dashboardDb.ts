@@ -107,26 +107,36 @@ export function recoveryRowToInvoice(row: any): Invoice {
   }
 
   // 4. Calculate Risk Score (0-100) & Risk Tier
+  // Prioritize persisted AI risk score and reason from recovery_outreach table
+  const rawRiskScore = row.risk_score !== null && row.risk_score !== undefined ? Number(row.risk_score) : null;
+  const riskReason = (row.risk_reason || '').trim() || undefined;
+
   let riskScore = 100;
-  if (daysOverdue >= 60) riskScore -= 50;
-  else if (daysOverdue >= 30) riskScore -= 35;
-  else if (daysOverdue >= 15) riskScore -= 20;
-  else if (daysOverdue > 0) riskScore -= 5;
+  if (rawRiskScore !== null && !isNaN(rawRiskScore)) {
+    // Database has a validated AI / historical score
+    riskScore = Math.max(10, Math.min(99, Math.round(rawRiskScore)));
+  } else {
+    // Fallback: calculate from overdue days, dispute, and sentiment
+    if (daysOverdue >= 60) riskScore -= 50;
+    else if (daysOverdue >= 30) riskScore -= 35;
+    else if (daysOverdue >= 15) riskScore -= 20;
+    else if (daysOverdue > 0) riskScore -= 5;
 
-  if (row.dispute === 'yes' || row.dispute === 'true' || status === 'disputed') {
-    riskScore -= 25;
-  }
-
-  if (row.sentiment_score !== null && row.sentiment_score !== undefined) {
-    const sScore = Number(row.sentiment_score);
-    if (!isNaN(sScore)) {
-      if (sScore < 0) riskScore -= 15;
-      else if (sScore < 50 && sScore > 1) riskScore -= 10;
+    if (row.dispute === 'yes' || row.dispute === 'true' || status === 'disputed') {
+      riskScore -= 25;
     }
-  } else if (row.sentiment && (row.sentiment.toLowerCase() === 'negative' || row.sentiment.toLowerCase() === 'urgent' || row.sentiment.toLowerCase() === 'evasive')) {
-    riskScore -= 15;
+
+    if (row.sentiment_score !== null && row.sentiment_score !== undefined) {
+      const sScore = Number(row.sentiment_score);
+      if (!isNaN(sScore)) {
+        if (sScore < 0) riskScore -= 15;
+        else if (sScore < 50 && sScore > 1) riskScore -= 10;
+      }
+    } else if (row.sentiment && (row.sentiment.toLowerCase() === 'negative' || row.sentiment.toLowerCase() === 'urgent' || row.sentiment.toLowerCase() === 'evasive')) {
+      riskScore -= 15;
+    }
+    riskScore = Math.max(10, Math.min(99, riskScore));
   }
-  riskScore = Math.max(10, Math.min(99, riskScore));
 
   let riskTier: CustomerRiskTier = 'reliable';
   if (riskScore < 45) riskTier = 'high_risk';
@@ -239,7 +249,7 @@ export function recoveryRowToInvoice(row: any): Invoice {
       description: row.summary || `Intent registered: ${row.intent}`,
     });
   }
-  if (row.Payment_Date || row.Final_Amount) {
+  if ((status === 'paid' || row.closed?.toLowerCase() === 'yes') && (row.Payment_Date || row.Final_Amount)) {
     timeline.push({
       id: `evt-pay-${row.id}`,
       timestamp: row.Payment_Date || new Date().toISOString(),
@@ -248,6 +258,14 @@ export function recoveryRowToInvoice(row: any): Invoice {
       description: `Received Final Amount ₹${Number(row.Final_Amount || amount).toLocaleString('en-IN')}`,
     });
   }
+
+  // 8. Strict chronological sorting (oldest event at top -> newest at bottom)
+  timeline.sort((a, b) => {
+    const timeA = new Date(a.timestamp).getTime();
+    const timeB = new Date(b.timestamp).getTime();
+    if (isNaN(timeA) || isNaN(timeB)) return 0;
+    return timeA - timeB;
+  });
 
   return {
     id: String(row.id),
@@ -266,6 +284,7 @@ export function recoveryRowToInvoice(row: any): Invoice {
     status,
     riskScore,
     riskTier,
+    riskReason,
     cadence: 'standard',
     currentStage,
     escalation: getEscalationValue(row) || undefined,
@@ -335,10 +354,11 @@ export function recoveryRowsToCustomers(invoices: Invoice[]): Record<string, Cus
         bucket: inv.bucket,
         riskScore: inv.riskScore,
         riskTier: inv.riskTier,
+        riskReason: inv.riskReason,
         cadence: inv.cadence,
         isLockedByOwner: false,
         lastUpdatedAfterPayment: 'Recently',
-        whyExplanation: `${inv.customerCompany} has ₹${inv.amount.toLocaleString('en-IN')} in active recovery.`,
+        whyExplanation: inv.riskReason || `${inv.customerCompany} has ₹${inv.amount.toLocaleString('en-IN')} in active recovery.`,
         historyFactors: {
           latePaymentsCount: inv.daysOverdue > 0 ? 1 : 0,
           avgDaysLate: inv.daysOverdue,
@@ -347,15 +367,25 @@ export function recoveryRowsToCustomers(invoices: Invoice[]): Record<string, Cus
           disputesCount: inv.hasDispute ? 1 : 0,
           partPaymentHabits: 'rare',
         },
-        scoreBreakdown: [
-          {
-            factor: 'Overdue Ageing',
-            impact: inv.daysOverdue > 30 ? 'High' : 'Medium',
-            points: inv.daysOverdue > 30 ? -35 : -10,
-            isPositive: false,
-            explanation: `${inv.daysOverdue} days since issue`,
-          },
-        ],
+        scoreBreakdown: inv.riskReason
+          ? [
+              {
+                factor: 'AI Credit Risk Assessment',
+                impact: inv.riskTier === 'high_risk' ? 'High' : inv.riskTier === 'watch' ? 'Medium' : 'Low',
+                points: inv.riskScore,
+                isPositive: inv.riskScore >= 70,
+                explanation: inv.riskReason,
+              },
+            ]
+          : [
+              {
+                factor: 'Overdue Ageing',
+                impact: inv.daysOverdue > 30 ? 'High' : 'Medium',
+                points: inv.daysOverdue > 30 ? -35 : -10,
+                isPositive: false,
+                explanation: `${inv.daysOverdue} days since issue`,
+              },
+            ],
         totalOutstanding: inv.amount,
         totalPaidLifetime: inv.status === 'paid' ? inv.amount : 0,
         avgPaymentDays: inv.daysOverdue,
@@ -441,14 +471,15 @@ export function recoveryRowsToPayments(rawRows: any[]): PaymentRecord[] {
   const payments: PaymentRecord[] = [];
 
   for (const r of rawRows) {
-    if (r.Payment_Date || r.Final_Amount || r.status?.toLowerCase() === 'paid' || r.closed?.toLowerCase() === 'yes') {
+    const isPaid = r.status?.toLowerCase() === 'paid' || r.closed?.toLowerCase() === 'yes';
+    if (isPaid) {
       payments.push({
         id: `pay-${r.id}`,
         invoiceId: `inv-${r.id}`,
         invoiceNumber: r.bill_no || r.voucher_no || `INV-${r.id}`,
         customerName: r.party_name || r.customer_name || 'Customer',
         customerCompany: r.party_name || r.customer_name || 'Customer',
-        amount: Number(r.Final_Amount || r.overdue_amount || 0),
+        amount: Number(r.Final_Amount || r.overdue_amount || r.debit || 0),
         paymentMethod: r.Type || 'Bank Settlement',
         paymentNote: r.Note || undefined,
         bankReference: r.voucher_no || `REF-${r.id}`,
@@ -539,11 +570,23 @@ export async function loadDashboardData(
     const rawPayments = localStorage.getItem(getPaymentsKey(safeUserId, planTier, normalizedEmail));
 
     if (rawInvoices && rawCustomers) {
+      const parsedInvoices: Invoice[] = JSON.parse(rawInvoices);
+      const openInvoiceIds = new Set(
+        parsedInvoices
+          .filter((inv) => inv.status !== 'paid' && inv.currentStage !== 'Done')
+          .flatMap((inv) => [inv.id, inv.invoiceNumber])
+          .filter(Boolean)
+      );
+      const rawPaymentsList: PaymentRecord[] = rawPayments ? JSON.parse(rawPayments) : [];
+      const cleanPayments = rawPaymentsList.filter(
+        (p) => !openInvoiceIds.has(p.invoiceId) && !openInvoiceIds.has(p.invoiceNumber)
+      );
+
       return {
-        invoices: JSON.parse(rawInvoices),
+        invoices: parsedInvoices,
         customers: JSON.parse(rawCustomers),
         focusItems: rawFocus ? JSON.parse(rawFocus) : [],
-        payments: rawPayments ? JSON.parse(rawPayments) : [],
+        payments: cleanPayments,
         isCloud: false,
       };
     }

@@ -5,9 +5,6 @@ import {
   mockKeyMetrics, 
   mockAgeingBuckets, 
   mockChannelPerformances, 
-  mockFocusItems, 
-  mockInvoices, 
-  mockCustomers, 
   mockCashForecast 
 } from './data/mockData';
 import { 
@@ -164,10 +161,10 @@ export function DashboardView({
     setSelectedEntity(entities[0]);
   }, [entities]);
 
-  // Main data states (populated and persisted in database)
-  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
-  const [customers, setCustomers] = useState<Record<string, CustomerProfile>>(mockCustomers);
-  const [focusItems, setFocusItems] = useState<FocusItem[]>(mockFocusItems);
+  // Main data states (populated and persisted exclusively in database)
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [customers, setCustomers] = useState<Record<string, CustomerProfile>>({});
+  const [focusItems, setFocusItems] = useState<FocusItem[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [selectedBucket, setSelectedBucket] = useState<AgeingBucketId>('all');
   const [keyMetrics] = useState(mockKeyMetrics);
@@ -361,9 +358,38 @@ export function DashboardView({
     .filter((inv) => inv.status !== 'paid' && inv.currentStage !== 'Done' && inv.daysOverdue > 0)
     .reduce((sum, inv) => sum + inv.amount, 0);
 
-  const totalRecovered = 924000 + payments
-    .filter((p) => p.id !== 'pay-seed-1')
-    .reduce((sum, p) => sum + p.amount, 0);
+  // Active open invoice IDs/numbers
+  const openInvoiceKeys = React.useMemo(() => new Set(
+    invoices
+      .filter((inv) => inv.status !== 'paid' && inv.currentStage !== 'Done')
+      .flatMap((inv) => [inv.id, inv.invoiceNumber])
+      .filter(Boolean)
+  ), [invoices]);
+
+  // Verified / Collected Payments (excludes any phantom payment linked to an open invoice)
+  const verifiedPaymentsList = React.useMemo(() => (
+    payments.filter(
+      (p) =>
+        (p.status === 'verified' || !p.status) &&
+        !openInvoiceKeys.has(p.invoiceId) &&
+        !openInvoiceKeys.has(p.invoiceNumber)
+    )
+  ), [payments, openInvoiceKeys]);
+
+  const paymentInvoiceKeys = new Set(
+    verifiedPaymentsList.flatMap((p) => [p.invoiceId, p.invoiceNumber]).filter(Boolean)
+  );
+
+  const totalRecovered =
+    verifiedPaymentsList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) +
+    invoices
+      .filter(
+        (inv) =>
+          (inv.status === 'paid' || inv.currentStage === 'Done') &&
+          !paymentInvoiceKeys.has(inv.id) &&
+          !paymentInvoiceKeys.has(inv.invoiceNumber)
+      )
+      .reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
 
   // Active Debtor Accounts: COUNT(DISTINCT customer_company) from active overdue receivables
   const activeAccountsCount = React.useMemo(() => {
@@ -1380,17 +1406,17 @@ export function DashboardView({
                 touchesTodayCount={touchesTodayCount}
                 pendingOwnerItemsCount={focusItems.length}
                 invoices={invoices}
-                payments={payments}
+                payments={verifiedPaymentsList}
                 onViewLedger={() => navigateToTab('ledger')}
                 onViewChannels={() => navigateToTab('forecast')}
                 onScrollToFocus={() => navigateToTab('focus')}
               />
 
               {/* Distribution-only due-date and settlement intelligence */}
-              <PeakStatsPanel invoices={invoices} payments={payments} />
+              <PeakStatsPanel invoices={invoices} payments={verifiedPaymentsList} />
 
               {/* Action queues built from live ledger and payment data */}
-              <CourseDesignCardsPanel invoices={invoices} payments={payments} />
+              <CourseDesignCardsPanel invoices={invoices} payments={verifiedPaymentsList} />
 
               {/* Customer Table */}
               <LedgerTableBlock

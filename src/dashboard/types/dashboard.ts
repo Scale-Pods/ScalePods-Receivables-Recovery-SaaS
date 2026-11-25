@@ -26,6 +26,7 @@ export interface CustomerProfile {
   bucket: 'early' | '15+' | '30+' | '60+';
   riskScore: number; // 0-100
   riskTier: CustomerRiskTier; // Reliable | Watch | High Risk
+  riskReason?: string;
   cadence: CadenceIntensity; // Light | Standard | Intensive
   isLockedByOwner: boolean;
   lockedReason?: string;
@@ -100,6 +101,7 @@ export interface Invoice {
   status: InvoiceStatus;
   riskScore: number;
   riskTier: CustomerRiskTier;
+  riskReason?: string;
   cadence: CadenceIntensity;
   isLockedByOwner?: boolean;
   currentStage: 'Friendly' | 'Firm' | 'Escalation' | 'Executive Hold' | 'Executive/Legal Hold' | 'Done';

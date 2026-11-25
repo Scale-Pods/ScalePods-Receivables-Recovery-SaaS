@@ -81,6 +81,36 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
     }
   };
 
+  const formatTimelineTimestamp = (raw: string) => {
+    if (!raw) return '';
+    const parsed = new Date(raw);
+    if (isNaN(parsed.getTime())) return raw;
+    if (raw.length <= 10) {
+      return new Intl.DateTimeFormat('en-IN', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+      }).format(parsed);
+    }
+    return new Intl.DateTimeFormat('en-IN', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(parsed);
+  };
+
+  const sortedTimeline = React.useMemo(() => {
+    if (!invoice?.timeline) return [];
+    return [...invoice.timeline].sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      if (isNaN(timeA) || isNaN(timeB)) return 0;
+      return timeA - timeB;
+    });
+  }, [invoice?.timeline]);
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm flex justify-end animate-in fade-in duration-150">
       
@@ -328,7 +358,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
               </span>
 
               <div className="relative pl-5 space-y-4 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-[1px] before:bg-zinc-200 dark:before:bg-zinc-800">
-                {invoice.timeline.map((evt) => (
+                {sortedTimeline.map((evt) => (
                   <div key={evt.id} className="relative">
                     <div className="absolute -left-5 top-1 w-3 h-3 rounded-full bg-zinc-200 dark:bg-zinc-800 border-2 border-white dark:border-[#101014]" />
 
@@ -338,7 +368,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                         <span>{evt.title}</span>
                       </span>
                       <span className="text-[10px] font-mono text-zinc-400">
-                        {evt.timestamp}
+                        {formatTimelineTimestamp(evt.timestamp)}
                       </span>
                     </div>
 

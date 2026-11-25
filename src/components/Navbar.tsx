@@ -193,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {currentUser ? (
             <button
               onClick={onOpenUpgrade}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-purple-600 capitalize"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-recovr-button capitalize"
             >
               {currentUser.planTier}
             </button>
@@ -207,7 +207,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
               <button
                 onClick={() => onOpenAuth('signup')}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-purple-600 whitespace-nowrap"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-recovr-button whitespace-nowrap"
               >
                 Create Account
               </button>

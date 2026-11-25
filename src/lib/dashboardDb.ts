@@ -33,6 +33,16 @@ const getPaymentsKey = (userId: string, tier: string, email?: string) =>
 // Row <-> Model Adapters for recovery_outreach table
 // --------------------------------------------------------------------------
 
+/**
+ * Approvals are driven exclusively by recovery_outreach."Escalation".
+ * Empty / null values mean the row is not queued for owner approval.
+ */
+export function getEscalationValue(row: any): string {
+  const raw = row?.Escalation ?? row?.escalation;
+  if (raw === null || raw === undefined) return '';
+  return String(raw).trim();
+}
+
 export function recoveryRowToInvoice(row: any): Invoice {
   const amount = Number(row.overdue_amount || row.debit || row.running_balance || 0);
   const invoiceNumber = row.bill_no || row.voucher_no || `INV-${row.id}`;
@@ -258,6 +268,7 @@ export function recoveryRowToInvoice(row: any): Invoice {
     riskTier,
     cadence: 'standard',
     currentStage,
+    escalation: getEscalationValue(row) || undefined,
     lastTouch,
     nextScheduledStep: row.next_action || (daysOverdue > 21 ? 'Manual Review' : 'Day 1 Friendly Email'),
     hasProofFile: false,
@@ -376,27 +387,29 @@ export function recoveryRowsToFocusItems(invoices: Invoice[], rawRows: any[] = [
     const inv = invoices[i];
     const raw = rawRows[i] || {};
 
-    // 1. Founder Review / Approvals
-    if (raw.founder_review === 'true' || raw.founder_review === 'yes') {
+    // 1. Approvals — only rows with a value in recovery_outreach."Escalation"
+    const escalation = getEscalationValue(raw);
+    if (escalation) {
       items.push({
-        id: `focus-fr-${inv.id}`,
+        id: `focus-esc-${inv.id}`,
         type: 'approval',
-        title: `Approve Next Escalation: ${inv.customerCompany}`,
+        title: `Escalation Review: ${inv.customerCompany}`,
         customerName: inv.customerName,
         company: inv.customerCompany,
         invoiceId: inv.invoiceNumber,
         amount: inv.amount,
-        badgeText: 'Approval Required',
+        badgeText: 'Escalation Approval',
         badgeVariant: 'amber',
-        description: raw.next_action || `Step requires founder sign-off before sending to ${inv.customerName}`,
+        description: `Escalation flagged: ${escalation}. Requires owner approval before the next recovery step.`,
         actionPrimary: {
           label: 'Approve & Send',
-          actionKey: 'approve_step',
+          actionKey: 'human_approval',
         },
         actionSecondary: {
           label: 'Pause Outreach',
           actionKey: 'pause_invoice',
         },
+        details: { escalation },
       });
     }
 
@@ -419,30 +432,6 @@ export function recoveryRowsToFocusItems(invoices: Invoice[], rawRows: any[] = [
         },
       });
     }
-
-    // 3. Invoices >= 22 Days (Escalation / Day 22 Focus)
-    if (inv.status === 'active' && inv.daysOverdue >= 22) {
-      items.push({
-        id: `focus-d22-${inv.id}`,
-        type: 'approval',
-        title: `21-Day Engine Complete: ${inv.customerCompany}`,
-        customerName: inv.customerName,
-        company: inv.customerCompany,
-        invoiceId: inv.invoiceNumber,
-        amount: inv.amount,
-        badgeText: 'Legal Hold Review',
-        badgeVariant: 'rose',
-        description: `Full autonomous sequence finished (${inv.daysOverdue} days overdue). Ready for formal recovery.`,
-        actionPrimary: {
-          label: 'Initiate Legal Notice',
-          actionKey: 'legal_notice',
-        },
-        actionSecondary: {
-          label: 'Grant 7-Day Extension',
-          actionKey: 'extend_grace',
-        },
-      });
-    }
   }
 
   return items;
@@ -460,7 +449,8 @@ export function recoveryRowsToPayments(rawRows: any[]): PaymentRecord[] {
         customerName: r.party_name || r.customer_name || 'Customer',
         customerCompany: r.party_name || r.customer_name || 'Customer',
         amount: Number(r.Final_Amount || r.overdue_amount || 0),
-        paymentMethod: 'Bank Settlement',
+        paymentMethod: r.Type || 'Bank Settlement',
+        paymentNote: r.Note || undefined,
         bankReference: r.voucher_no || `REF-${r.id}`,
         status: 'verified',
         settledAt: r.Payment_Date || r.updated_at || new Date().toISOString(),
@@ -717,6 +707,8 @@ export async function recordPaymentInDb(
         closed: 'yes',
         Final_Amount: String(payment.amount),
         Payment_Date: payment.settledAt || new Date().toISOString(),
+        Type: payment.paymentMethod || null,
+        Note: payment.paymentNote || null,
         current_stage: 'Done',
         updated_at: new Date().toISOString(),
       };

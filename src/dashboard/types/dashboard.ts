@@ -103,6 +103,8 @@ export interface Invoice {
   cadence: CadenceIntensity;
   isLockedByOwner?: boolean;
   currentStage: 'Friendly' | 'Firm' | 'Escalation' | 'Executive Hold' | 'Executive/Legal Hold' | 'Done';
+  /** Populated from recovery_outreach."Escalation"; only these rows enter Approvals. */
+  escalation?: string;
   lastTouch: {
     channel: ChannelType;
     action: string;
@@ -210,6 +212,26 @@ export interface BusinessEntity {
   collectionRate: number;
 }
 
+/** Payment modes written to recovery_outreach."Type" when an invoice is marked paid. */
+export type PaymentType =
+  | 'NEFT'
+  | 'RTGS'
+  | 'IMPS'
+  | 'UPI'
+  | 'Bank Transfer'
+  | 'Cheque Payments'
+  | 'Cheque';
+
+export const PAYMENT_TYPE_OPTIONS: { value: PaymentType; label: string; description: string }[] = [
+  { value: 'NEFT', label: 'NEFT', description: 'National Electronic Funds Transfer' },
+  { value: 'RTGS', label: 'RTGS', description: 'Real Time Gross Settlement' },
+  { value: 'IMPS', label: 'IMPS', description: 'Immediate Payment Service' },
+  { value: 'UPI', label: 'UPI', description: 'Unified Payments Interface' },
+  { value: 'Bank Transfer', label: 'Bank Transfer', description: 'General account-to-account transfer' },
+  { value: 'Cheque Payments', label: 'Cheque Payments', description: 'Cheque payment received' },
+  { value: 'Cheque', label: 'Cheque', description: 'Cheque payment' },
+];
+
 export interface PaymentRecord {
   id: string;
   invoiceId: string;
@@ -218,6 +240,8 @@ export interface PaymentRecord {
   customerCompany: string;
   amount: number;
   paymentMethod: string;
+  /** Saved to recovery_outreach."Note" alongside the payment. */
+  paymentNote?: string;
   bankReference: string;
   proofUrl?: string;
   status: 'verified' | 'pending';

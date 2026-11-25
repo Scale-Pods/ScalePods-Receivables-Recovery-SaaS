@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -123,6 +123,7 @@
 .animate-wave-6 { animation: wave-pulse 1.4s ease-in-out infinite 0.35s; }
 .animate-wave-7 { animation: wave-pulse 0.7s ease-in-out infinite 0.1s; }
 
+/* Invoice intake styles live in ./intake.css (imported by InvoiceIntakeBlock). */
 /* Subtle scrollbars */
 ::-webkit-scrollbar {
   width: 5px;

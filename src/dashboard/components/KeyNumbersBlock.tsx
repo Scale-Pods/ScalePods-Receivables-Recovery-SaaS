@@ -79,7 +79,7 @@ export const KeyNumbersBlock: React.FC<KeyNumbersBlockProps> = ({
               <div
                 key={metric.id}
                 onClick={onUpgradePrompt}
-                className="rounded-xl border border-dashed border-slate-300/90 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-900/20 p-3.5 flex flex-col justify-between cursor-pointer hover:border-purple-400 dark:hover:border-zinc-700 transition-colors"
+                className="dashboard-card is-ghost flex min-h-[112px] cursor-pointer flex-col justify-between p-3.5"
               >
                 <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
                   <span className="truncate">{metric.title}</span>
@@ -98,7 +98,7 @@ export const KeyNumbersBlock: React.FC<KeyNumbersBlockProps> = ({
           return (
             <div
               key={metric.id}
-              className="rounded-xl border border-slate-200/90 dark:border-zinc-800 bg-gradient-to-b from-white to-slate-50/50 dark:from-zinc-900/60 dark:to-zinc-900/60 p-3.5 flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_16px_rgba(0,0,0,0.02)] dark:shadow-card-dark hover:border-purple-300/70 dark:hover:border-zinc-700 transition-all"
+              className="dashboard-card flex min-h-[112px] flex-col justify-between p-3.5"
             >
               <div>
                 <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 mb-1">

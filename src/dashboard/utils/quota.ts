@@ -1,4 +1,5 @@
 import { PlanTier } from '../types/dashboard';
+import type { DynamicPlanQuota } from '../../lib/planLimits';
 
 export interface PlanQuota {
   invoiceLimit: number;
@@ -49,9 +50,15 @@ export function calculateQuotaUsage(
   planTier: PlanTier,
   invoicesCount: number,
   voiceMinutesUsed: number,
-  topUp: TopUpState = { extraInvoices: 0, extraMinutes: 0 }
+  topUp: TopUpState = { extraInvoices: 0, extraMinutes: 0 },
+  dynamicQuota?: DynamicPlanQuota | null
 ): QuotaUsage {
-  const base = TIER_QUOTAS[planTier] || TIER_QUOTAS.free;
+  const fallback = TIER_QUOTAS[planTier] || TIER_QUOTAS.free;
+  const base: PlanQuota = {
+    invoiceLimit: dynamicQuota?.invoiceLimit ?? fallback.invoiceLimit,
+    voiceMinutesLimit: dynamicQuota?.voiceMinutesLimit ?? fallback.voiceMinutesLimit,
+    isCustom: dynamicQuota?.isCustom ?? fallback.isCustom,
+  };
   const isCustom = Boolean(base.isCustom);
 
   const invoiceLimit = isCustom ? 99999 : base.invoiceLimit + (topUp.extraInvoices || 0);

@@ -50,7 +50,7 @@ export const TodaysFocusBlock: React.FC<TodaysFocusBlockProps> = ({
         </h2>
       </div>
 
-      <div className="relative rounded-2xl border border-slate-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-4 sm:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_10px_25px_rgba(124,58,237,0.03)] overflow-hidden">
+      <div className="dashboard-card relative p-4 sm:p-5">
         
         {/* Tier Lock State */}
         {isLocked && (

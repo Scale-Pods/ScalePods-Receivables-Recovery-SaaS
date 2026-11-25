@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
-  UploadCloud, 
   Cpu, 
   TrendingUp, 
   CreditCard, 
@@ -73,71 +72,61 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     { id: 'overview' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'focus' as ActiveTab, label: 'Approvals', icon: CheckCircle2, badge: pendingActionsCount > 0 ? pendingActionsCount : undefined },
-    { id: 'intake' as ActiveTab, label: 'Intake', icon: UploadCloud },
-    { id: 'sequence' as ActiveTab, label: '21-Day Sequence', icon: Cpu },
+    { id: 'ledger' as ActiveTab, label: 'Ledger', icon: CreditCard },
+    { id: 'sequence' as ActiveTab, label: 'Sequence', icon: Cpu },
     { id: 'forecast' as ActiveTab, label: 'Cash Forecast', icon: TrendingUp },
   ];
 
   return (
     <aside 
-      className={`relative flex flex-col h-screen sticky top-0 border-r border-slate-200/90 dark:border-zinc-800/80 bg-white/95 dark:bg-[#07080D] backdrop-blur-md shadow-[1px_0_4px_rgba(0,0,0,0.02)] dark:shadow-none transition-all duration-200 z-30 select-none ${
+      className={`dashboard-card sidebar-card z-30 m-3 flex h-[calc(100vh-1.5rem)] shrink-0 select-none flex-col top-3 transition-all duration-200 ${
         isCollapsed ? 'w-16' : 'w-64'
       }`}
     >
       {/* Brand Header */}
-      <div className={`h-[70px] shrink-0 box-border border-b border-slate-200/90 dark:border-zinc-800/80 flex items-center ${
-        isCollapsed ? 'px-2 justify-between' : 'px-4 justify-between'
+      <div className={`h-[118px] shrink-0 box-border border-b border-slate-200/90 dark:border-zinc-800/80 flex flex-col items-center justify-center ${
+        isCollapsed ? 'px-2' : 'px-4'
       }`}>
         {!isCollapsed ? (
-          <>
-            <div 
-              onClick={() => setActiveTab('overview')}
-              className="flex items-center cursor-pointer select-none"
-            >
-              <img
-                src={isDark ? '/scalepods-logo-white.png' : '/scalepods-logo-dark.png'}
-                alt="ScalePods"
-                className="h-5 w-auto object-contain"
-              />
-            </div>
-
-            <button
-              onClick={() => setIsCollapsed(true)}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-              title="Collapse"
-              aria-label="Collapse sidebar"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-          </>
-        ) : (
-          <div className="w-full flex items-center justify-between">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className="w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs font-mono text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0 border border-zinc-200 dark:border-zinc-800"
-              title="ScalePods Dashboard"
-              aria-label="ScalePods Dashboard"
-            >
-              SP
-            </button>
-
-            <button
-              onClick={() => setIsCollapsed(false)}
-              className="p-1 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
-              title="Expand sidebar"
-              aria-label="Expand sidebar"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+          <div 
+            onClick={() => setActiveTab('overview')}
+            className="flex items-center cursor-pointer select-none"
+          >
+            <img
+              src={isDark ? '/scalepods-logo-white.png' : '/scalepods-logo-dark.png'}
+              alt="ScalePods"
+              className="h-6 w-auto object-contain"
+            />
           </div>
+        ) : (
+          <button
+            onClick={() => setActiveTab('overview')}
+            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs font-mono text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0 border border-zinc-200 dark:border-zinc-800"
+            title="ScalePods Dashboard"
+            aria-label="ScalePods Dashboard"
+          >
+            SP
+          </button>
         )}
       </div>
+
+      {/* Retract control, centred on the right edge */}
+      <button
+        onClick={() => setIsCollapsed((value) => !value)}
+        className={`absolute -right-2.5 top-1/2 z-40 -translate-y-1/2 rounded-full border border-slate-200 bg-white/95 p-1.5 text-zinc-400 shadow-[0_8px_20px_-8px_rgba(15,23,42,0.5)] backdrop-blur-md transition-colors hover:text-zinc-900 hover:bg-white dark:border-zinc-700 dark:bg-[#111218]/95 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-[#15161d] cursor-pointer ${
+          isCollapsed ? 'p-1' : ''
+        }`}
+        title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
 
       {/* Quick Action */}
       <div className="p-3 border-b border-slate-200/90 dark:border-zinc-800/60">
         <button
           onClick={() => setActiveTab('intake')}
-          className={`w-full py-2 px-3.5 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
+          className={`w-full py-2 px-3.5 rounded-xl text-sm font-semibold text-white bg-recovr-button hover:bg-recovr-button-hover transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
             isCollapsed ? 'px-1' : ''
           }`}
           title="Add Invoice"
@@ -148,7 +137,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Nav List */}
-      <nav className="flex-1 px-2.5 py-3 space-y-1.5 overflow-y-auto">
+      <nav className={`flex-1 space-y-3 overflow-y-auto py-4 ${
+        isCollapsed ? 'px-1.5' : 'px-3'
+      }`}>
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           const Icon = item.icon;
@@ -157,10 +148,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+              data-accent="violet"
+              className={`dashboard-card flex w-full items-center gap-3 px-3 py-3 text-sm ${
                 isActive
-                  ? 'bg-purple-50 text-purple-700 dark:bg-purple-600/15 dark:text-purple-300 font-bold border border-purple-200/80 dark:border-transparent shadow-xs'
-                  : 'text-zinc-600 dark:text-zinc-400 font-medium hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100/80 dark:hover:bg-zinc-900'
+                  ? 'is-selected font-bold text-purple-700 dark:text-purple-300'
+                  : 'font-medium text-zinc-600 hover:bg-zinc-100/80 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100'
               }`}
               title={item.label}
             >
@@ -185,7 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="border-t border-slate-200/90 dark:border-zinc-800/80 p-3 space-y-2">
         {/* Monthly Quota Mini Card */}
         {!isCollapsed && quota && (
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-50/50 via-white to-slate-50 dark:from-zinc-900/60 dark:to-zinc-900/60 border border-purple-200/60 dark:border-zinc-800/80 space-y-2 text-xs shadow-xs">
+          <div className="dashboard-card space-y-2 p-2.5 text-xs">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-[11px] text-zinc-500 dark:text-zinc-400">Monthly Quota</span>
             </div>

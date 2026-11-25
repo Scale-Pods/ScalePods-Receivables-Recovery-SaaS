@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { 
   X, 
   Check, 
@@ -6,16 +6,22 @@ import {
   ArrowRight, 
   Lock, 
   CreditCard, 
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UserAccount, PlanTierType } from '../types/auth';
 import { initiateRazorpayPayment } from '../lib/razorpay';
-import { 
+import {
   sendPlanPurchaseWebhook, 
   createRazorpayOrderViaWebhook, 
   sendPaymentVerificationWebhook 
 } from '../lib/webhook';
+import {
+  buildEntitlements,
+  fetchPlanLimits,
+  type PlanEntitlement
+} from '../lib/planLimits';
 
 interface TierPurchaseModalProps {
   isOpen: boolean;
@@ -26,79 +32,6 @@ interface TierPurchaseModalProps {
   onUpgradeSuccess: (newTier: PlanTierType, cycle: 'monthly' | 'annual') => void;
   onRequireAuth: () => void;
 }
-
-interface EntitlementTier {
-  id: PlanTierType;
-  name: string;
-  badge: string;
-  isPopular?: boolean;
-  isCustomPrice?: boolean;
-  monthlyPrice: number;
-  annualPrice: number;
-  period: string;
-  invoiceQuota: string;
-  channels: string;
-  callMinutes: string;
-  sequences: string;
-  aiFeatures: string;
-}
-
-export const planEntitlements: EntitlementTier[] = [
-  {
-    id: 'free',
-    name: 'Free',
-    badge: 'Starter',
-    monthlyPrice: 0,
-    annualPrice: 0,
-    period: 'forever',
-    invoiceQuota: '10 invoices / mo',
-    channels: 'Email only',
-    callMinutes: 'None',
-    sequences: 'Light only (Day 1)',
-    aiFeatures: 'Invoice reading & templates',
-  },
-  {
-    id: 'basic',
-    name: 'Basic',
-    badge: 'Test Plan (₹1)',
-    monthlyPrice: 1,
-    annualPrice: 1,
-    period: 'per month',
-    invoiceQuota: '50 invoices / mo',
-    channels: 'Email, WhatsApp',
-    callMinutes: 'None',
-    sequences: 'Light & Standard, tone choice',
-    aiFeatures: 'Adds message writing in business tone',
-  },
-  {
-    id: 'growth',
-    name: 'Growth',
-    badge: 'Most Popular',
-    isPopular: true,
-    monthlyPrice: 7999,
-    annualPrice: 6399,
-    period: 'per month',
-    invoiceQuota: '300 invoices / mo',
-    channels: 'Email, WhatsApp, AI Voice Calls',
-    callMinutes: '90 AI voice mins / mo',
-    sequences: 'Light, Standard, Intensive + 21-Day editor',
-    aiFeatures: 'Reply reading, promise capture, multi-lingual',
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    badge: 'Autonomous',
-    isCustomPrice: true,
-    monthlyPrice: 0,
-    annualPrice: 0,
-    period: 'contract',
-    invoiceQuota: 'Unlimited volume',
-    channels: 'All + Dedicated WhatsApp & Custom Voice',
-    callMinutes: 'Custom / Pooled quota',
-    sequences: 'Custom sequences of any length (7-90+ days)',
-    aiFeatures: 'AI-agreed payment plans, self-improving timing',
-  },
-];
 
 export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
   isOpen,
@@ -112,11 +45,43 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
   // Current active tier
   const currentTier = (currentUser?.planTier?.toLowerCase() || 'free') as PlanTierType;
 
+  // Plan rows are loaded from /api/plan-limits (server-only read of Price).
+  const [entitlements, setEntitlements] = useState<PlanEntitlement[] | null>(null);
+  const [pricingError, setPricingError] = useState(false);
+
   // Selected plan to switch to / pay for
   const [selectedTierId, setSelectedTierId] = useState<PlanTierType>('growth');
   const [billingAnnual, setBillingAnnual] = useState<boolean>(isAnnual);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+
+  const loadPlans = useCallback(async () => {
+    setPricingError(false);
+    const rows = await fetchPlanLimits(true);
+    if (rows.length) {
+      setEntitlements(buildEntitlements(rows));
+    } else {
+      setEntitlements(null);
+      setPricingError(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPlanLimits(true).then((rows) => {
+      if (cancelled) return;
+      if (rows.length) {
+        setEntitlements(buildEntitlements(rows));
+        setPricingError(false);
+      } else {
+        setEntitlements(null);
+        setPricingError(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Sync state when modal opens
   useEffect(() => {
@@ -183,20 +148,63 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
     );
   }
 
+  if (!entitlements) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+        <div className="w-full max-w-md glass-card rounded-2xl border border-purple-500/30 bg-[#0C0D18] p-7 text-center text-white shadow-2xl space-y-4 relative">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors cursor-pointer"
+            aria-label="Close upgrade modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          {pricingError ? (
+            <>
+              <h3 className="text-lg font-bold">Live pricing unavailable</h3>
+              <p className="text-xs text-zinc-400">
+                Plan prices could not be loaded from the server. No cached prices are shown.
+              </p>
+              <button
+                onClick={loadPlans}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-recovr-button cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Retry
+              </button>
+            </>
+          ) : (
+            <>
+              <Loader2 className="w-7 h-7 animate-spin text-purple-400 mx-auto" />
+              <h3 className="text-lg font-bold">Loading live plan pricing...</h3>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Active target plan
-  const targetPlan = planEntitlements.find(p => p.id === selectedTierId) || planEntitlements[2];
+  const targetPlan = entitlements.find(p => p.id === selectedTierId) || entitlements[2];
   const isSelectedCurrent = targetPlan.id === currentTier;
   const isFreePlan = targetPlan.id === 'free';
   const isCustomPrice = targetPlan.isCustomPrice;
   const activeRate = billingAnnual ? targetPlan.annualPrice : targetPlan.monthlyPrice;
-  const formattedPrice = isCustomPrice 
-    ? 'Custom' 
-    : isFreePlan 
-      ? '₹0' 
-      : `₹${activeRate.toLocaleString('en-IN')}`;
+  const formattedPrice = isCustomPrice || isFreePlan
+    ? targetPlan.priceLabel || (isFreePlan ? '₹0' : 'Custom')
+    : `₹${activeRate.toLocaleString('en-IN')}`;
+  const yearlyDiscountPercent = (plan: PlanEntitlement) => {
+    const monthlyX12 = plan.monthlyPrice * 12;
+    if (plan.isCustomPrice || monthlyX12 <= 0 || plan.annualPrice <= 0) return 0;
+    return Math.max(0, Math.round((1 - plan.annualPrice / monthlyX12) * 100));
+  };
+  const annualDiscountPercent = entitlements.reduce(
+    (max, plan) => Math.max(max, yearlyDiscountPercent(plan)),
+    0
+  );
+  const targetDiscountPercent = yearlyDiscountPercent(targetPlan);
 
   // Select a plan card in matrix
-  const handlePlanCardClick = (tier: EntitlementTier) => {
+  const handlePlanCardClick = (tier: PlanEntitlement) => {
     setSelectedTierId(tier.id);
   };
 
@@ -205,9 +213,8 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
     e.preventDefault();
     if (isSelectedCurrent) return;
 
-    const payableAmount = targetPlan.id === 'basic' 
-      ? 1 
-      : (billingAnnual ? targetPlan.annualPrice * 12 : targetPlan.monthlyPrice);
+    // Price_yearly is the total annual amount; do not multiply it by 12.
+    const payableAmount = billingAnnual ? targetPlan.annualPrice : targetPlan.monthlyPrice;
 
     // Free tier downgrade doesn't require payment
     if (isFreePlan) {
@@ -226,7 +233,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
       setTimeout(() => {
         setIsProcessing(false);
         setIsComplete(true);
-        onUpgradeSuccess('enterprise', 'annual');
+        onUpgradeSuccess(targetPlan.id, 'annual');
       }, 1000);
       return;
     }
@@ -355,7 +362,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                   type="button"
                   onClick={() => setBillingAnnual(false)}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-                    !billingAnnual ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-zinc-400 hover:text-white'
+                    !billingAnnual ? 'bg-recovr-button text-white font-bold shadow-md' : 'text-zinc-400 hover:text-white'
                   }`}
                 >
                   Monthly
@@ -364,27 +371,28 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                   type="button"
                   onClick={() => setBillingAnnual(true)}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                    billingAnnual ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-zinc-400 hover:text-white'
+                    billingAnnual ? 'bg-recovr-button text-white font-bold shadow-md' : 'text-zinc-400 hover:text-white'
                   }`}
                 >
                   <span>Annual</span>
-                  <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                    -20% OFF
-                  </span>
+                  {annualDiscountPercent > 0 && (
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                      -{annualDiscountPercent}% OFF
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
 
             {/* 4-COLUMN ENTITLEMENTS COMPARISON MATRIX (Exact Layout as Dashboard Settings) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              {planEntitlements.map((p) => {
+              {entitlements.map((p) => {
                 const isActive = currentTier === p.id;
                 const isSelected = selectedTierId === p.id;
-                const price = p.isCustomPrice 
-                  ? 'Custom' 
-                  : p.id === 'free' 
-                    ? '₹0' 
-                    : `₹${(billingAnnual ? p.annualPrice : p.monthlyPrice).toLocaleString('en-IN')}`;
+                const activeAmount = billingAnnual ? p.annualPrice : p.monthlyPrice;
+                const price = p.isCustomPrice || activeAmount === 0
+                  ? (p.priceLabel || (p.isCustomPrice ? 'Custom' : '₹0'))
+                  : `₹${activeAmount.toLocaleString('en-IN')}`;
 
                 return (
                   <div
@@ -415,7 +423,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                       <div className="mb-3">
                         <span className="text-2xl font-bold font-mono text-white">{price}</span>
                         <span className="text-[10px] text-zinc-400 ml-1 font-mono">
-                          /{p.id === 'free' ? 'forever' : billingAnnual ? 'mo (billed annually)' : p.period}
+                          /{p.id === 'free' ? 'forever' : billingAnnual ? 'year' : 'month'}
                         </span>
                       </div>
 
@@ -453,7 +461,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                           Active Current Plan ✓
                         </div>
                       ) : isSelected ? (
-                        <div className="w-full py-2 rounded-xl text-xs font-bold text-center text-white bg-purple-600 shadow-md shadow-purple-600/30">
+                        <div className="w-full py-2 rounded-xl text-xs font-bold text-center text-white bg-recovr-button shadow-md shadow-recovr-button/30">
                           Selected for Upgrade ✓
                         </div>
                       ) : (
@@ -463,7 +471,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                             e.stopPropagation();
                             handlePlanCardClick(p);
                           }}
-                          className="w-full py-2 rounded-xl text-xs font-semibold text-center text-zinc-300 bg-zinc-800 hover:bg-purple-600 hover:text-white transition-colors cursor-pointer"
+                          className="w-full py-2 rounded-xl text-xs font-semibold text-center text-zinc-300 bg-zinc-800 hover:bg-recovr-button hover:text-white transition-colors cursor-pointer"
                         >
                           Select {p.name}
                         </button>
@@ -488,7 +496,11 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                       <div className="text-sm font-bold text-white flex items-center gap-2">
                         <span>Payment for {targetPlan.name} Tier</span>
                         <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">
-                          {billingAnnual ? 'Annual Billing (-20%)' : 'Monthly Billing'}
+                          {billingAnnual
+                            ? targetDiscountPercent > 0
+                              ? `Annual Billing (-${targetDiscountPercent}%)`
+                              : 'Annual Billing'
+                            : 'Monthly Billing'}
                         </span>
                       </div>
                       <div className="text-xs text-zinc-400 font-mono mt-0.5">
@@ -501,16 +513,18 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                     <div className="text-2xl font-black font-mono text-white">
                       {formattedPrice}
                       {!isCustomPrice && !isFreePlan && (
-                        <span className="text-xs font-normal text-zinc-400 ml-1">/mo</span>
+                        <span className="text-xs font-normal text-zinc-400 ml-1">
+                          {billingAnnual ? '/yr' : '/mo'}
+                        </span>
                       )}
                     </div>
                     {!isCustomPrice && !isFreePlan && (
                       <div className="text-[10px] text-zinc-400 font-mono">
-                        {targetPlan.id === 'basic'
-                          ? 'Test payment mode: Flat ₹1 total'
-                          : billingAnnual 
-                            ? `₹${(targetPlan.annualPrice * 12).toLocaleString('en-IN')}/year total (Saved ₹${((targetPlan.monthlyPrice - targetPlan.annualPrice) * 12).toLocaleString('en-IN')})` 
-                            : 'Billed monthly recurring'}
+                        {billingAnnual
+                          ? targetDiscountPercent > 0
+                            ? `₹${targetPlan.annualPrice.toLocaleString('en-IN')}/year total (Saved ₹${Math.max(0, targetPlan.monthlyPrice * 12 - targetPlan.annualPrice).toLocaleString('en-IN')})`
+                            : `₹${targetPlan.annualPrice.toLocaleString('en-IN')}/year total`
+                          : 'Billed monthly recurring'}
                       </div>
                     )}
                   </div>
@@ -519,7 +533,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                 {/* If Free Tier: confirmation note */}
                 {isFreePlan && (
                   <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
-                    Switching to the <strong>Free Tier</strong> will restrict monthly recovery to 10 invoices and email-only reminders. No payment is charged.
+                    Switching to the <strong>Free Tier</strong> will restrict monthly recovery to {targetPlan.invoiceQuota} and email-only reminders. No payment is charged.
                   </div>
                 )}
 

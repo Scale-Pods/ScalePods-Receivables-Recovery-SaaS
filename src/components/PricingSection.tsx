@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { pricingPlans, PricingPlan } from '../data/landingData';
-import { Check, Sparkles, ArrowRight } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import type { PricingPlan } from '../data/landingData';
+import { Check, Sparkles, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 import { UserAccount } from '../types/auth';
+import { buildPricingPlans, fetchPlanLimits } from '../lib/planLimits';
 
 interface PricingSectionProps {
   currentUser: UserAccount | null;
@@ -15,12 +16,69 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
   onOpenAuth,
 }) => {
   const [isAnnual, setIsAnnual] = useState(true);
+  const [plans, setPlans] = useState<PricingPlan[] | null>(null);
+  const [pricingError, setPricingError] = useState(false);
+
+  const loadPlans = useCallback(async () => {
+    setPricingError(false);
+    // Force refresh so DB price edits appear on the next page load.
+    const rows = await fetchPlanLimits(true);
+    if (rows.length) {
+      setPlans(buildPricingPlans(rows));
+    } else {
+      setPlans(null);
+      setPricingError(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPlanLimits(true).then((rows) => {
+      if (cancelled) return;
+      if (rows.length) {
+        setPlans(buildPricingPlans(rows));
+        setPricingError(false);
+      } else {
+        setPlans(null);
+        setPricingError(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const formatPrice = (plan: PricingPlan) => {
-    if (plan.monthlyPriceINR === 0 && !plan.isCustomPrice) return '₹0';
-    if (plan.isCustomPrice) return 'Custom';
+    if (plan.isCustomPrice) return plan.priceLabel || 'Custom';
+    if (plan.monthlyPriceINR === 0 && plan.annualPriceINR === 0) return plan.priceLabel || '₹0';
     const price = isAnnual ? plan.annualPriceINR : plan.monthlyPriceINR;
     return `₹${price.toLocaleString('en-IN')}`;
+  };
+
+  const yearlyDiscountPercent = (plan: PricingPlan) => {
+    const monthlyX12 = plan.monthlyPriceINR * 12;
+    if (plan.isCustomPrice || monthlyX12 <= 0 || plan.annualPriceINR <= 0) return 0;
+    return Math.max(0, Math.round((1 - plan.annualPriceINR / monthlyX12) * 100));
+  };
+
+  const maxAnnualDiscount = (plans ?? []).reduce(
+    (max, plan) => Math.max(max, yearlyDiscountPercent(plan)),
+    0
+  );
+
+  const billingNote = (plan: PricingPlan) => {
+    if (plan.monthlyPriceINR === 0 && plan.annualPriceINR === 0 && !plan.isCustomPrice) {
+      return 'Free forever • No credit card';
+    }
+    if (plan.isCustomPrice) return plan.priceLabel === 'Custom' ? 'Tailored volume & custom SLA' : 'Contact sales for pricing';
+    if (plan.id === 'basic' && plan.monthlyPriceINR === 1) return 'Test payment plan • ₹1 charge';
+    if (isAnnual) {
+      const discount = yearlyDiscountPercent(plan);
+      return discount > 0
+        ? `Billed yearly with ${discount}% discount`
+        : 'Billed yearly, no hidden charges';
+    }
+    return 'Billed monthly, cancel anytime';
   };
 
   return (
@@ -40,6 +98,11 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
           <p className="text-zinc-600 dark:text-zinc-400 text-sm sm:text-base leading-relaxed">
             No commission cuts. No hidden percentage take rates.
           </p>
+          {plans && (
+            <p className="text-[10px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              Live prices from recovery_plan_limits
+            </p>
+          )}
 
           {/* Modern Segmented Billing Toggle */}
           <div className="pt-4 flex items-center justify-center">
@@ -57,7 +120,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                 Monthly Billing
               </button>
 
-              {/* Annual Button with Save 20% badge */}
+              {/* Annual Button with dynamic discount badge */}
               <button
                 type="button"
                 onClick={() => setIsAnnual(true)}
@@ -73,7 +136,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                     ? 'bg-emerald-400/20 text-emerald-800 dark:text-emerald-300 border border-emerald-400/40'
                     : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
                 }`}>
-                  Save 20%
+                  {maxAnnualDiscount > 0 ? `Save up to ${maxAnnualDiscount}%` : 'Annual billing'}
                 </span>
               </button>
             </div>
@@ -81,9 +144,29 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
 
         </div>
 
+        {/* Live pricing status */}
+        {!plans && !pricingError && (
+          <div className="mb-8 flex items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+            <Loader2 className="w-4 h-4 animate-spin text-purple-500" />
+            Loading live pricing...
+          </div>
+        )}
+        {pricingError && (
+          <div className="mb-8 mx-auto max-w-xl rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-center text-sm text-red-700 dark:text-red-300">
+            Live pricing could not be loaded.{' '}
+            <button
+              type="button"
+              onClick={loadPlans}
+              className="inline-flex items-center gap-1 font-semibold underline underline-offset-2 cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Retry
+            </button>
+          </div>
+        )}
+
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-7xl mx-auto items-stretch">
-          {pricingPlans.map((plan) => {
+          {(plans ?? []).map((plan) => {
             const isCurrentActiveTier = currentUser?.planTier === plan.id;
 
             return (
@@ -125,22 +208,14 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                       <span className="text-3xl sm:text-4xl font-extrabold font-mono text-zinc-900 dark:text-white tracking-tight">
                         {formatPrice(plan)}
                       </span>
-                      {!plan.isCustomPrice && plan.monthlyPriceINR > 0 && (
+                      {!plan.isCustomPrice && (isAnnual ? plan.annualPriceINR : plan.monthlyPriceINR) > 0 && (
                         <span className="text-xs text-zinc-500 font-mono">
-                          / month
+                          {isAnnual ? '/ year' : '/ month'}
                         </span>
                       )}
                     </div>
                     <div className="text-[11px] font-mono text-zinc-500 mt-1 min-h-[16px]">
-                      {plan.monthlyPriceINR === 0 && !plan.isCustomPrice
-                        ? 'Free forever • No credit card'
-                        : plan.isCustomPrice
-                        ? 'Tailored volume & custom SLA'
-                        : plan.id === 'basic'
-                        ? 'Test payment plan • ₹1 charge'
-                        : isAnnual
-                        ? 'Billed annually with 20% discount'
-                        : 'Billed monthly, cancel anytime'}
+                      {billingNote(plan)}
                     </div>
                   </div>
 

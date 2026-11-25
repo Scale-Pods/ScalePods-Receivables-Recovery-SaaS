@@ -245,11 +245,8 @@ export const Day22ApprovalsBlock: React.FC<Day22ApprovalsBlockProps> = ({
           return (
             <div
               key={item.id}
-              className={`rounded-2xl border p-5 transition-all duration-200 flex flex-col justify-between ${
-                isApproved
-                  ? 'border-emerald-500/30 bg-emerald-500/[0.03] dark:bg-emerald-950/10'
-                  : 'border-slate-200/90 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] hover:border-purple-300 dark:hover:border-zinc-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_8px_20px_rgba(124,58,237,0.03)]'
-              }`}
+              data-accent={isApproved ? 'emerald' : 'violet'}
+              className={`dashboard-card flex flex-col justify-between p-5 ${isApproved ? 'is-selected' : ''}`}
             >
               <div className="space-y-4">
                 {/* Header: Avatar, Company, Status Pill */}
@@ -288,7 +285,7 @@ export const Day22ApprovalsBlock: React.FC<Day22ApprovalsBlockProps> = ({
 
                 {/* Statutory Calculation Breakdown Box */}
                 {item.statutoryCalculation && (
-                  <div className="rounded-xl border border-slate-200 dark:border-zinc-800/80 bg-slate-50/80 dark:bg-zinc-900/50 p-3.5 space-y-2.5">
+                  <div className="dashboard-card space-y-2.5 p-3.5">
                     <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400 pb-2 border-b border-slate-200 dark:border-zinc-800">
                       <span>Statutory Basis</span>
                       <span className="text-zinc-800 dark:text-zinc-200 font-medium text-right max-w-[240px] truncate">

@@ -45,6 +45,64 @@
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Database**: [Supabase](https://supabase.com/) (PostgreSQL 15+ with RLS) + LocalStorage Fallback
 - **Effects**: Canvas Confetti
+- **Server Workflow**: Vercel-style `/api` handlers + Node middleware for local Vite dev
+- **Document AI**: Anthropic Messages API (PDF/image/CSV/TXT invoice extraction)
+- **UI primitives**: shadcn-compatible structure at root-level `components/ui`
+
+---
+
+## 🧩 shadcn-style UI Components
+
+TypeScript and Tailwind were already configured, so no new runtime dependencies were required. The shadcn structure was added explicitly:
+
+- `components.json` points generated components to `@/components/ui`, utilities to `@/lib/utils`, and styles to `src/index.css`.
+- `@/*` resolves to `src/*`, while `@/components/*` resolves to the requested root-level `components/*` directory.
+- `tailwind.config.js` scans `./components/**/*` so classes inside copied/generated UI files are not purged.
+
+The Vite + `src` convention would normally place components under `src/components/ui`. This project intentionally uses `/components/ui` so the requested path and the `@/components/ui/...` import convention stay consistent. Creating this folder matters because shadcn CLI writes generated primitives there and every generated component imports from that alias; without the folder and aliases, imports break and Tailwind classes in those files are omitted from the production CSS.
+
+If setting this up from scratch:
+
+```bash
+# TypeScript (already installed here)
+npm install -D typescript @types/react @types/react-dom
+
+# Tailwind CSS (already installed here)
+npm install -D tailwindcss postcss autoprefixer
+
+# shadcn CLI (already configured here via components.json)
+npx shadcn@latest init
+npx shadcn@latest add button
+```
+
+The `PeakChart` component lives at `components/ui/peak-chart.tsx`; its source demo is at `components/ui/demo.tsx`. It uses only React, canvas and inline SVG, so no image assets, icon packages or providers are needed. `lucide-react` remains available for other UI.
+
+---
+
+## 🧾 Invoice Extraction & Approval Flow
+
+The n8n invoice path is now implemented in-code:
+
+1. `POST /api/invoice-extract` receives the uploaded binary (base64) plus customer/contact context and extracts invoice fields with Anthropic. This endpoint **never writes to Supabase**.
+2. The dashboard shows an editable preview with the extracted data, a short-lived signed draft token, and a read-only channel-by-channel schedule preview. Saved sequences can include pre-due touches (negative `day` values): each selected week repeats the plan's mix — Free 3 emails, Basic 2 emails + 1 WhatsApp, Growth/Enterprise email + WhatsApp + call. The rest of the schedule starts on the day after the due date and recalculates immediately when the due date is corrected. It uses the saved `Credentials.Sequence` when available, otherwise the locally saved/default cadence.
+3. `POST /api/invoice-approve` verifies the token, applies preview edits, re-derives the start date from the edited due date, fetches the customer's saved `Credentials.Sequence`, generates `start_date + (day - 1)` dates and channel counters (`email_N_date`, `wa_N_date`, `call_N_date`), checks duplicates by `gstin + bill_no` scoped to the logged-in account (`customer_uid`, falling back to `customer_email`), and only then inserts into `recovery_outreach`.
+4. `POST /api/sequence-save` stores the cadence chosen in Sequence Studio — including any pre-due reachouts selected under “Pre-due date reachouts” — into `Credentials.Sequence`. Studio shows the finalized sequence as a flowchart in the right-hand column.
+
+Required server env vars (see `.env.example`):
+
+```env
+ANTHROPIC_API_KEY=...
+ANTHROPIC_MODEL=claude-sonnet-4-6
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+DRAFT_SIGNING_SECRET=a-long-random-value
+```
+
+Run the workflow unit checks with:
+
+```bash
+npm test
+```
 
 ---
 
@@ -101,6 +159,11 @@ Generates production build artifacts in the `dist/` directory.
 recovr-landing-page/
 ├── .env.example               # Template environment variables
 ├── .gitignore                  # Git ignore rules for node_modules, .env, dist
+├── components.json             # shadcn component/alias configuration
+├── components/                 # shadcn-compatible UI primitives (root-level /components/ui)
+│   └── ui/
+│       ├── peak-chart.tsx      # Canvas + inline SVG revenue chart
+│       └── demo.tsx            # Source demo for PeakChart props
 ├── index.html                  # Single-page application entry HTML
 ├── package.json                # Project dependencies and build scripts
 ├── postcss.config.js           # PostCSS configuration for Tailwind
@@ -124,6 +187,7 @@ recovr-landing-page/
 │   │   │   ├── Header.tsx                 # Top app bar with theme toggle & user profile
 │   │   │   ├── Sidebar.tsx                # Left navigation bar (collapsible)
 │   │   │   ├── LedgerTableBlock.tsx       # Active Receivables vs Settled Archive
+│   │   │   ├── PeakStatsPanel.tsx         # Four due-date, ageing, closure and settlement charts
 │   │   │   ├── SequenceEngineBlock.tsx    # 21-Day Autonomous Engine & Day Stepper
 │   │   │   ├── Day22ApprovalsBlock.tsx    # Legal escalation, statutory claims & holds
 │   │   │   ├── ForecastAndTeamBlock.tsx   # 4-Week cash forecast & monthly velocity
@@ -133,6 +197,7 @@ recovr-landing-page/
 │   │   ├── data/               # Default mock datasets and simulation records
 │   │   ├── types/              # TypeScript interfaces for invoices, customers, & plans
 │   │   └── utils/              # INR currency formatters and helper utilities
+│   │       └── peakStats.ts    # Due-date series + open/closed/payment insight derivation
 │   └── lib/
 │       ├── dashboardDb.ts      # Dual-mode database persistence (Cloud + Local)
 │       └── supabase.ts         # Supabase client instantiation

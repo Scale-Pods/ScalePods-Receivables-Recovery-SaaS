@@ -4,6 +4,7 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
@@ -19,6 +20,8 @@ export default {
           border: 'rgba(255, 255, 255, 0.08)',
           accent: '#7C3AED',
           orange: '#C85A2A',
+          button: '#9D93C2',
+          'button-hover': '#8B80C4',
         }
       },
       boxShadow: {

@@ -67,8 +67,8 @@ export default async function handler(req, res) {
 
     // 3. Store refresh token in Supabase
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    // Server-side only: never fall back to a VITE_-prefixed service key.
     const supabaseKey =
-      process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
       process.env.VITE_SUPABASE_ANON_KEY;
 

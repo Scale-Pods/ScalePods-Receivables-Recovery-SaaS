@@ -140,7 +140,7 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
         )}
 
         {/* Funnel Pipeline Section */}
-        <div className="rounded-2xl border border-slate-200/90 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_8px_24px_rgba(124,58,237,0.03)] mb-6">
+        <div className="dashboard-card p-5 mb-6">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-zinc-800">
             <div>
               <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
@@ -163,11 +163,8 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
                 <div
                   key={stg.id}
                   onClick={() => onFilterByStage && onFilterByStage(stg.id)}
-                  className={`rounded-xl border p-3.5 transition-all cursor-pointer flex flex-col justify-between ${
-                    isSettled
-                      ? 'border-emerald-500/30 bg-emerald-500/[0.04] dark:bg-emerald-950/10 hover:border-emerald-500/50'
-                      : 'border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-900/40 hover:border-purple-300 dark:hover:border-zinc-700 hover:bg-purple-50/20'
-                  }`}
+                  data-accent={isSettled ? 'emerald' : 'violet'}
+                  className={`dashboard-card cursor-pointer p-3.5 ${isSettled ? 'is-selected' : ''}`}
                 >
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1.5">
@@ -210,7 +207,7 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
         </div>
 
         {/* Outreach Channels Side-by-Side */}
-        <div className="rounded-2xl border border-slate-200/90 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_8px_24px_rgba(124,58,237,0.03)]">
+        <div className="dashboard-card p-5">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-zinc-800">
             <div>
               <div className="flex items-center gap-2">
@@ -232,7 +229,7 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
             {channels.map((chan) => (
               <div
                 key={chan.channel}
-                className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#0E0F17] p-4 flex flex-col justify-between shadow-xs hover:border-slate-300 dark:hover:border-zinc-700 transition-colors"
+                className="dashboard-card flex flex-col justify-between p-4"
               >
                 <div>
                   {/* Channel Header */}

@@ -74,7 +74,7 @@ export const EmailIntegrationCard: React.FC<EmailIntegrationCardProps> = ({
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200/90 dark:border-zinc-800 bg-white dark:bg-[#0E0F16] p-5 sm:p-6 shadow-sm transition-all">
+    <div className="dashboard-card p-5 sm:p-6">
       
       {/* Top Banner & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-zinc-800/80">
@@ -113,7 +113,7 @@ export const EmailIntegrationCard: React.FC<EmailIntegrationCardProps> = ({
       <div className="py-5">
         {integration?.is_active ? (
           /* CONNECTED STATE */
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200/80 dark:border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="dashboard-card flex flex-col items-start justify-between gap-4 p-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               {/* Google 4-Color Icon */}
               <div className="w-9 h-9 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0 shadow-xs">

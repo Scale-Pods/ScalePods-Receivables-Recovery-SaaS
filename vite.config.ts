@@ -1,5 +1,8 @@
+import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { createInvoiceWorkflowHandler } from './server/invoiceWorkflow.js'
+import planLimitsHandler from './api/plan-limits.js'
 
 function googleTokenExchangePlugin(env: Record<string, string>): Plugin {
   return {
@@ -64,7 +67,6 @@ function googleTokenExchangePlugin(env: Record<string, string>): Plugin {
               // Upsert to Supabase if configured
               const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL
               const supabaseKey =
-                env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
                 env.SUPABASE_SERVICE_ROLE_KEY ||
                 env.VITE_SUPABASE_ANON_KEY
 
@@ -119,11 +121,49 @@ function googleTokenExchangePlugin(env: Record<string, string>): Plugin {
   }
 }
 
+function planLimitsPlugin(env: Record<string, string>): Plugin {
+  return {
+    name: 'plan-limits-dev-middleware',
+    configureServer(server) {
+      server.middlewares.use('/api/plan-limits', async (req, res) => {
+        await planLimitsHandler(req, res, env)
+      })
+    },
+  }
+}
+
+function invoiceWorkflowPlugin(env: Record<string, string>): Plugin {
+  const routes: Record<string, ReturnType<typeof createInvoiceWorkflowHandler>> = {
+    '/api/invoice-extract': createInvoiceWorkflowHandler('extract'),
+    '/api/invoice-approve': createInvoiceWorkflowHandler('approve'),
+    '/api/sequence-save': createInvoiceWorkflowHandler('sequence'),
+  }
+
+  return {
+    name: 'invoice-workflow-dev-middleware',
+    configureServer(server) {
+      for (const [path, handler] of Object.entries(routes)) {
+        server.middlewares.use(path, async (req, res) => {
+          await handler(req, res, env)
+        })
+      }
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [react(), googleTokenExchangePlugin(env)],
+    plugins: [react(), googleTokenExchangePlugin(env), planLimitsPlugin(env), invoiceWorkflowPlugin(env)],
+    resolve: {
+      alias: [
+        // Keep generated/copied UI primitives at the requested root-level /components/ui path.
+        { find: /^@\/components(?:\/|$)/, replacement: `${path.resolve(process.cwd(), 'components')}/` },
+        // Everything else follows the Vite + src convention used by the rest of the app.
+        { find: /^@\//, replacement: `${path.resolve(process.cwd(), 'src')}/` },
+      ],
+    },
     envPrefix: ['VITE_', 'SUPABASE_'],
   }
 })

@@ -101,7 +101,7 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
 
         {/* Forecast KPI Ribbon */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] p-4 shadow-sm">
+          <div className="dashboard-card p-4">
             <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
               4-Week Projected Inflow
             </div>
@@ -114,7 +114,7 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] p-4 shadow-sm">
+          <div className="dashboard-card p-4">
             <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
               Confidence-Weighted Cash
             </div>
@@ -126,7 +126,7 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] p-4 shadow-sm">
+          <div className="dashboard-card p-4">
             <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
               Peak Month Velocity
             </div>
@@ -138,7 +138,7 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] p-4 shadow-sm">
+          <div className="dashboard-card p-4">
             <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
               Prediction Accuracy
             </div>
@@ -171,7 +171,7 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
               return (
                 <div
                   key={fc.weekLabel}
-                  className="rounded-2xl border border-zinc-200 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] p-4 shadow-sm hover:border-zinc-300 dark:hover:border-zinc-700 transition-all flex flex-col justify-between"
+                  className="dashboard-card flex flex-col justify-between p-4"
                 >
                   <div>
                     {/* Week Title & Confidence */}
@@ -224,7 +224,7 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
         </div>
 
         {/* Monthly Recovery Velocity Section */}
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] p-5 shadow-sm mb-6">
+        <div className="dashboard-card p-5 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-zinc-100 dark:border-zinc-800">
             <div>
               <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
@@ -286,7 +286,7 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
         </div>
 
         {/* Multi-business Subsidiaries & Team Split */}
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800/90 bg-white dark:bg-[#0A0B10] p-5 shadow-sm">
+        <div className="dashboard-card p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-zinc-100 dark:border-zinc-800">
             <div>
               <div className="flex items-center gap-2">
@@ -324,11 +324,7 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
                   <div
                     key={ent.id}
                     onClick={() => onSelectEntity(ent)}
-                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                      isSelected
-                        ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-zinc-900 shadow-sm'
-                        : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0E0F17] hover:border-zinc-300 dark:hover:border-zinc-700'
-                    }`}
+                    className={`dashboard-card flex cursor-pointer items-center justify-between p-3 ${isSelected ? 'is-selected' : ''}`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
@@ -360,7 +356,7 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
               {mockTeamPerformance.map((tp) => (
                 <div
                   key={tp.agentName}
-                  className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0E0F17] flex items-center justify-between"
+                  className="dashboard-card flex items-center justify-between p-3"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center font-bold text-xs border border-zinc-200 dark:border-zinc-700">

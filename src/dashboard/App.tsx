@@ -17,9 +17,10 @@ import {
   CustomerProfile, 
   CustomerRiskTier,
   CadenceIntensity,
-  FocusItem, 
+  FocusItem,
   BusinessEntity,
-  PaymentRecord
+  PaymentRecord,
+  PaymentType
 } from './types/dashboard';
 
 import { 
@@ -34,6 +35,8 @@ import {
 import { Sidebar, ActiveTab } from './components/Sidebar';
 import { TopNavbar } from './components/Header';
 import { ThreeQuestionsBar } from './components/ThreeQuestionsBar';
+import { PeakStatsPanel } from './components/PeakStatsPanel';
+import { CourseDesignCardsPanel } from './components/CourseDesignCardsPanel';
 import { TodaysFocusBlock } from './components/TodaysFocusBlock';
 import { KeyNumbersBlock } from './components/KeyNumbersBlock';
 import { AgeingBucketsBlock } from './components/AgeingBucketsBlock';
@@ -49,11 +52,14 @@ import { calculateQuotaUsage, TopUpState } from './utils/quota';
 import { TimelineDrawer } from './components/TimelineDrawer';
 import { ProofModal } from './components/ProofModal';
 import { PauseModal, ChangeBucketModal, AnswerTicketModal } from './components/ActionModals';
+import { MarkPaidModal } from './components/MarkPaidModal';
 import { Sun, Moon, LogOut } from 'lucide-react';
 import { CustomerRiskModal } from './components/CustomerRiskModal';
 import { NotificationToast, ToastMessage } from './components/NotificationToast';
 import { formatINR } from './utils/formatters';
 import { UserAccount } from '../types/auth';
+import { type InvoiceApprovalResult } from '../lib/invoiceWorkflow';
+import { buildQuotaMap, fetchPlanLimits, type DynamicPlanQuota } from '../lib/planLimits';
 
 export interface DashboardViewProps {
   currentUser?: UserAccount | null;
@@ -161,36 +167,41 @@ export function DashboardView({
           setInvoices(res.invoices);
           setCustomers(res.customers);
           
-          // Ensure any active invoice at or past Day 22 (>= 22 days) appears in Approvals tab
-          const baseFocus = res.focusItems || [];
+          // Approvals only contain rows that have a value in recovery_outreach."Escalation"
+          const escalationInvoiceIds = new Set(
+            (res.invoices || []).filter((inv: Invoice) => Boolean(inv.escalation)).map((inv: Invoice) => inv.invoiceNumber)
+          );
+          const baseFocus = (res.focusItems || []).filter(
+            (f: FocusItem) => f.type !== 'approval' || escalationInvoiceIds.has(f.invoiceId)
+          );
           const existingIds = new Set(baseFocus.map((f: FocusItem) => f.invoiceId));
-          const overdue22Items: FocusItem[] = (res.invoices || [])
-            .filter((inv: Invoice) => inv.status === 'active' && inv.daysOverdue >= 22 && !existingIds.has(inv.invoiceNumber))
+          const escalationItems: FocusItem[] = (res.invoices || [])
+            .filter((inv: Invoice) => Boolean(inv.escalation) && !existingIds.has(inv.invoiceNumber))
             .map((inv: Invoice) => ({
-              id: `foc-d22-${inv.id}`,
+              id: `foc-esc-${inv.id}`,
               type: 'approval' as const,
-              title: `Day 22 Final Recovery Review: ${inv.invoiceNumber}`,
+              title: `Escalation Review: ${inv.customerCompany}`,
               customerName: inv.customerName,
               company: inv.customerCompany,
               invoiceId: inv.invoiceNumber,
               amount: inv.amount,
-              badgeText: 'Overdue 22 Days Over',
-              badgeVariant: 'rose' as const,
-              description: `Invoice has passed 22 days overdue (final day of sequence). Autonomous cadence paused. Requires human approval for next action.`,
+              badgeText: 'Escalation Approval',
+              badgeVariant: 'amber' as const,
+              description: `Escalation flagged: ${inv.escalation}. Requires owner approval before the next recovery step.`,
               actionPrimary: {
-                label: 'Human Approval',
+                label: 'Approve & Send',
                 actionKey: 'human_approval',
               },
               actionSecondary: {
-                label: 'Extend 7 Days',
-                actionKey: 'extend_day22_grace',
+                label: 'Pause Outreach',
+                actionKey: 'pause_invoice',
               },
               details: {
-                daysOverdue: inv.daysOverdue,
+                escalation: inv.escalation,
               },
             }));
 
-          setFocusItems([...overdue22Items, ...baseFocus]);
+          setFocusItems([...escalationItems, ...baseFocus]);
           setPayments(res.payments);
           setIsCloudDb(res.isCloud);
         }
@@ -208,6 +219,7 @@ export function DashboardView({
 
   // Modals & Drawer states
   const [selectedInvoiceForTimeline, setSelectedInvoiceForTimeline] = useState<Invoice | null>(null);
+  const [selectedInvoiceForMarkPaid, setSelectedInvoiceForMarkPaid] = useState<Invoice | null>(null);
   const [selectedInvoiceForProof, setSelectedInvoiceForProof] = useState<Invoice | null>(null);
   const [selectedInvoiceForPause, setSelectedInvoiceForPause] = useState<Invoice | null>(null);
   const [selectedInvoiceForBucket, setSelectedInvoiceForBucket] = useState<Invoice | null>(null);
@@ -219,6 +231,7 @@ export function DashboardView({
 
   // Quota & Top-up state (Feature #13: Usage meters & Top-ups)
   const [isTopUpOpen, setIsTopUpOpen] = useState<boolean>(false);
+  const [dynamicQuotas, setDynamicQuotas] = useState<Partial<Record<PlanTier, DynamicPlanQuota>>>({});
   const [topUpState, setTopUpState] = useState<TopUpState>(() => {
     try {
       const stored = localStorage.getItem(`recovr_topup_${currentUser?.email || 'guest'}`);
@@ -227,6 +240,16 @@ export function DashboardView({
       return { extraInvoices: 0, extraMinutes: 0 };
     }
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPlanLimits(true).then((rows) => {
+      if (!cancelled && rows.length) setDynamicQuotas(buildQuotaMap(rows));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const voiceMinutesUsed = React.useMemo(() => {
     let total = 0;
@@ -242,8 +265,14 @@ export function DashboardView({
   }, [invoices]);
 
   const quota = React.useMemo(() => {
-    return calculateQuotaUsage(planTier, invoices.length, voiceMinutesUsed, topUpState);
-  }, [planTier, invoices.length, voiceMinutesUsed, topUpState]);
+    return calculateQuotaUsage(
+      planTier,
+      invoices.length,
+      voiceMinutesUsed,
+      topUpState,
+      dynamicQuotas[planTier]
+    );
+  }, [planTier, invoices.length, voiceMinutesUsed, topUpState, dynamicQuotas]);
 
   const handleApplyTopUp = (extraInvoices: number, extraMinutes: number, packName: string) => {
     setTopUpState((prev) => {
@@ -349,8 +378,8 @@ export function DashboardView({
     };
   });
 
-  // Owner Action 1: Mark Paid & Record Payment in Database
-  const handleMarkPaid = (invoice: Invoice) => {
+  // Persists the settlement once the owner has chosen the payment type and note.
+  const completeMarkPaid = (invoice: Invoice, paymentType: PaymentType, note: string) => {
     let updatedInv: Invoice = { ...invoice };
     setInvoices((prev) =>
       prev.map((inv) => {
@@ -365,7 +394,7 @@ export function DashboardView({
                 timestamp: 'Just now',
                 type: 'payment_verified',
                 title: 'Payment Received — Leaves Bucket',
-                description: `Payment of ${formatINR(inv.amount)} received. Invoice leaves ${inv.bucket.toUpperCase()} bucket.`,
+                description: `Payment of ${formatINR(inv.amount)} received via ${paymentType}. Invoice leaves ${inv.bucket.toUpperCase()} bucket.${note ? ` Note: ${note}` : ''}`,
               },
               ...inv.timeline,
             ],
@@ -413,7 +442,8 @@ export function DashboardView({
       customerName: invoice.customerName,
       customerCompany: invoice.customerCompany,
       amount: invoice.amount,
-      paymentMethod: invoice.hasProofFile && invoice.proofFile?.bankReference.includes('NEFT') ? 'NEFT' : 'RTGS / Bank Wire',
+      paymentMethod: paymentType,
+      paymentNote: note || undefined,
       bankReference: invoice.proofFile?.bankReference || `UTR-${Date.now().toString().slice(-8)}`,
       proofUrl: invoice.proofFile?.filename,
       status: 'verified',
@@ -439,8 +469,18 @@ export function DashboardView({
     addToast(
       'success',
       `Payment Recorded: ${formatINR(invoice.amount)}`,
-      `Database updated. #${invoice.invoiceNumber} archived to Settled. Bank UTR: ${paymentRecord.bankReference}`
+      `${paymentType} saved to ledger. #${invoice.invoiceNumber} archived to Settled. Bank UTR: ${paymentRecord.bankReference}`
     );
+  };
+
+  // Owner Action 1: Ask for payment mode + note before marking paid.
+  const handleMarkPaid = (invoice: Invoice) => {
+    setSelectedInvoiceForMarkPaid(invoice);
+  };
+
+  const handleConfirmMarkPaid = (invoice: Invoice, paymentType: PaymentType, note: string) => {
+    completeMarkPaid(invoice, paymentType, note);
+    setSelectedInvoiceForMarkPaid(null);
   };
 
   // Owner Action 2: View Proof
@@ -921,6 +961,7 @@ export function DashboardView({
       riskTier: newInv.bucket === '60+' ? 'high_risk' : newInv.bucket === '30+' ? 'watch' : 'reliable',
       cadence: newInv.cadence || 'standard',
       currentStage: newInv.currentStage || 'Friendly',
+      escalation: newInv.escalation?.trim() || undefined,
       lastTouch: {
         channel: 'email',
         action: 'Enrolled in 21-Day Autonomous Cadence',
@@ -942,32 +983,30 @@ export function DashboardView({
 
     setInvoices((prev) => [fullInvoice, ...prev]);
 
-    // If invoice reached Day 22 (>= 22 days overdue), queue it in Approvals with 'Overdue 22 Days Over' tag
-    if (fullInvoice.daysOverdue >= 22) {
-      const day22FocusItem: FocusItem = {
-        id: `foc-d22-${fullInvoice.id}`,
+    // Only escalated invoices enter the Approvals queue.
+    if (fullInvoice.escalation) {
+      const escalationFocusItem: FocusItem = {
+        id: `foc-esc-${fullInvoice.id}`,
         type: 'approval',
-        title: `Day 22 Final Recovery Review: ${fullInvoice.invoiceNumber}`,
+        title: `Escalation Review: ${fullInvoice.customerCompany}`,
         customerName: fullInvoice.customerName,
         company: fullInvoice.customerCompany,
         invoiceId: fullInvoice.invoiceNumber,
         amount: fullInvoice.amount,
-        badgeText: 'Overdue 22 Days Over',
-        badgeVariant: 'rose',
-        description: `Invoice has passed 22 days overdue (final day of sequence). Autonomous cadence paused. Requires human approval for next action.`,
+        badgeText: 'Escalation Approval',
+        badgeVariant: 'amber',
+        description: `Escalation flagged: ${fullInvoice.escalation}. Requires owner approval before the next recovery step.`,
         actionPrimary: {
-          label: 'Human Approval',
+          label: 'Approve & Send',
           actionKey: 'human_approval',
         },
         actionSecondary: {
-          label: 'Extend 7 Days',
-          actionKey: 'extend_day22_grace',
+          label: 'Pause Outreach',
+          actionKey: 'pause_invoice',
         },
-        details: {
-          daysOverdue: fullInvoice.daysOverdue,
-        },
+        details: { escalation: fullInvoice.escalation },
       };
-      setFocusItems((prev) => [day22FocusItem, ...prev]);
+      setFocusItems((prev) => [escalationFocusItem, ...prev]);
     }
 
     // Persist new invoice to Database
@@ -989,10 +1028,113 @@ export function DashboardView({
     setActiveTab('ledger');
   };
 
+  // Approval path: the server has already generated dates and inserted the row.
+  // This handler only mirrors the approved record into the dashboard state.
+  const handleApprovedInvoice = (result: InvoiceApprovalResult) => {
+    const row = result.row || {};
+    const extracted = result.extracted;
+    const invNumber = row.bill_no || extracted?.bill_no || `INV-${Date.now().toString().slice(-4)}`;
+    const amount = Number(row.overdue_amount ?? extracted?.overdue_amount ?? 0);
+    const dueDate = row.transaction_date || row.oldest_due_date || extracted?.due_date || extracted?.transaction_date || new Date().toISOString().split('T')[0];
+    const daysOverdue = Number(row.max_overdue_days ?? extracted?.max_overdue_days ?? 0);
+    const bucket: Invoice['bucket'] = daysOverdue >= 60 ? '60+' : daysOverdue >= 30 ? '30+' : daysOverdue >= 15 ? '15+' : 'early';
+    const stageRaw = String(row.current_stage || '').toLowerCase();
+    const currentStage: Invoice['currentStage'] = stageRaw.includes('legal') || stageRaw.includes('executive')
+      ? 'Executive/Legal Hold'
+      : stageRaw.includes('escalat')
+        ? 'Escalation'
+        : stageRaw.includes('firm')
+          ? 'Firm'
+          : 'Friendly';
+    const riskScore = Number(row.risk_score ?? (bucket === '60+' ? 35 : bucket === '30+' ? 58 : 82));
+    const riskTier: CustomerRiskTier = riskScore < 45 ? 'high_risk' : riskScore < 70 ? 'watch' : 'reliable';
+
+    const fullInvoice: Invoice = {
+      id: String(row.id || `inv-${Date.now()}`),
+      invoiceNumber: invNumber,
+      customerId: `cust-${row.id || Date.now()}`,
+      customerName: row.party_name || extracted?.party_name || 'Accounts Payable',
+      customerEmail: row.email || extracted?.email || '',
+      customerPhone: row.phone || extracted?.phone || '',
+      customerCompany: row.party_name || extracted?.party_name || 'Unspecified Client',
+      amount,
+      currency: '₹',
+      dueDate,
+      daysOverdue,
+      bucket,
+      bucketTone: bucket === '60+' ? 'Urgent Daily Call' : bucket === '30+' ? 'Firm with Calls' : bucket === '15+' ? 'Firm' : 'Friendly',
+      status: 'active',
+      riskScore,
+      riskTier,
+      cadence: bucket === '60+' || bucket === '30+' ? 'intensive' : bucket === '15+' ? 'standard' : 'light',
+      currentStage,
+      escalation: String(row.Escalation ?? row.escalation ?? extracted?.Escalation ?? '').trim() || undefined,
+      lastTouch: {
+        channel: 'email',
+        action: result.next_action ? `Approved — ${result.next_action}` : 'Approved & scheduled',
+        timestamp: 'Just now',
+      },
+      nextScheduledStep: result.next_action,
+      hasProofFile: false,
+      hasTicket: false,
+      hasDispute: String(row.dispute || '').toLowerCase() === 'yes',
+      timeline: [
+        {
+          id: `tl-approved-${Date.now()}`,
+          timestamp: 'Just now',
+          type: 'owner_action',
+          title: 'Invoice Approved & Added to Supabase',
+          description: result.next_action_date
+            ? `${result.next_action || 'Recovery sequence'} scheduled for ${result.next_action_date}.`
+            : 'Recovery sequence scheduled from the saved cadence.',
+        },
+      ],
+    };
+
+    setInvoices((prev) => [fullInvoice, ...prev]);
+
+    if (fullInvoice.escalation) {
+      setFocusItems((prev) => [
+        {
+          id: `foc-esc-${fullInvoice.id}`,
+          type: 'approval',
+          title: `Escalation Review: ${fullInvoice.customerCompany}`,
+          customerName: fullInvoice.customerName,
+          company: fullInvoice.customerCompany,
+          invoiceId: fullInvoice.invoiceNumber,
+          amount: fullInvoice.amount,
+          badgeText: 'Escalation Approval',
+          badgeVariant: 'amber',
+          description: `Escalation flagged: ${fullInvoice.escalation}. Requires owner approval before the next recovery step.`,
+          actionPrimary: { label: 'Approve & Send', actionKey: 'human_approval' },
+          actionSecondary: { label: 'Pause Outreach', actionKey: 'pause_invoice' },
+          details: { escalation: fullInvoice.escalation },
+        },
+        ...prev,
+      ]);
+    }
+
+    triggerConfetti();
+    addToast(
+      'success',
+      `Approved & saved: ${invNumber}`,
+      result.next_action_date
+        ? `${result.next_action || 'Recovery sequence'} scheduled for ${result.next_action_date}.`
+        : 'Dates generated from your saved sequence.'
+    );
+    setActiveTab('ledger');
+  };
+
   // Customer Portal: Payment simulation
   const handleCustomerPaymentSuccess = (invoice: Invoice, amountPaid: number, method: string) => {
     if (amountPaid >= invoice.amount) {
-      handleMarkPaid(invoice);
+      // The portal already knows the Razorpay method, so skip the manual picker.
+      const portalPaymentType: PaymentType = method.toLowerCase().includes('upi') ? 'UPI' : 'Bank Transfer';
+      completeMarkPaid(
+        invoice,
+        portalPaymentType,
+        `Full payment of ${formatINR(amountPaid)} received via Razorpay (${method}).`
+      );
       addToast('success', 'Full Payment Cleared via Razorpay', `${formatINR(amountPaid)} confirmed via ${method}. Outstanding: ₹0.`);
     } else {
       const newBalance = invoice.amount - amountPaid;
@@ -1027,7 +1169,8 @@ export function DashboardView({
         customerName: invoice.customerName,
         customerCompany: invoice.customerCompany,
         amount: amountPaid,
-        paymentMethod: method || 'Razorpay UPI',
+        paymentMethod: method.toLowerCase().includes('upi') ? 'UPI' : 'Bank Transfer',
+        paymentNote: `Part payment of ${formatINR(amountPaid)} received via Razorpay (${method}).`,
         bankReference: `RZP-${Date.now().toString().slice(-8)}`,
         status: 'verified',
         settledAt: new Date().toISOString(),
@@ -1150,10 +1293,11 @@ export function DashboardView({
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8F9FD] dark:bg-[#07080D] text-zinc-900 dark:text-zinc-100 transition-colors duration-150 relative">
-      {/* Subtle ambient light gradient mesh for executive light mode */}
+      {/* Ambient gradient mesh that shows through the light-mode glass cards */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden -z-0 dark:hidden">
-        <div className="absolute -top-32 left-1/3 w-[550px] h-[350px] bg-purple-500/[0.04] rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -right-24 w-[450px] h-[350px] bg-indigo-500/[0.03] rounded-full blur-3xl" />
+        <div className="absolute -top-32 left-1/3 h-[360px] w-[600px] rounded-full bg-purple-500/[0.11] blur-3xl" />
+        <div className="absolute top-1/3 -right-24 h-[380px] w-[480px] rounded-full bg-indigo-500/[0.08] blur-3xl" />
+        <div className="absolute bottom-0 -left-24 h-[320px] w-[420px] rounded-full bg-orange-500/[0.06] blur-3xl" />
       </div>
       
       {/* Left Sidebar Navigation (Replaces overcrowded horizontal navbar) */}
@@ -1202,7 +1346,7 @@ export function DashboardView({
 
         {/* Scrollable Views Body */}
         <div className="flex-1 overflow-y-auto flex flex-col">
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <main className={`flex-1 w-full mx-auto ${activeTab === 'intake' ? '' : 'max-w-[2200px] px-[clamp(12px,2.2vw,48px)] py-5 sm:py-6'}`}>
           
           {/* VIEW 1: MAIN CLEAN DASHBOARD (Key Metrics + Customer Table) */}
           {activeTab === 'overview' && (
@@ -1215,10 +1359,18 @@ export function DashboardView({
                 activeWorkflowsCount={activeAccountsCount}
                 touchesTodayCount={touchesTodayCount}
                 pendingOwnerItemsCount={focusItems.length}
+                invoices={invoices}
+                payments={payments}
                 onViewLedger={() => setActiveTab('ledger')}
                 onViewChannels={() => setActiveTab('forecast')}
                 onScrollToFocus={() => setActiveTab('focus')}
               />
+
+              {/* Distribution-only due-date and settlement intelligence */}
+              <PeakStatsPanel invoices={invoices} payments={payments} />
+
+              {/* Action queues built from live ledger and payment data */}
+              <CourseDesignCardsPanel invoices={invoices} payments={payments} />
 
               {/* Customer Table */}
               <LedgerTableBlock
@@ -1289,6 +1441,7 @@ export function DashboardView({
                 planTier={planTier}
                 currentUser={currentUser}
                 onAddInvoice={handleAddInvoice}
+                onInvoiceApproved={handleApprovedInvoice}
                 onUpgradePrompt={handleUpgradePrompt}
                 quota={quota}
                 onOpenTopUp={() => setIsTopUpOpen(true)}
@@ -1296,7 +1449,7 @@ export function DashboardView({
             </div>
           )}
 
-          {/* VIEW 3: 21-DAY RECOVERY ENGINE (BRD Feature #5) */}
+          {/* VIEW 3: SEQUENCE STUDIO (BRD Feature #5) */}
           {activeTab === 'sequence' && (
             <div>
               <SequenceEngineBlock
@@ -1335,7 +1488,7 @@ export function DashboardView({
 
         {/* Footer */}
         <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#07080D] py-4 text-xs text-zinc-500 mt-auto">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="max-w-[2200px] mx-auto px-[clamp(12px,2.2vw,48px)] flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 font-mono">
               <img
                 src={isDark ? '/scalepods-logo-white.png' : '/scalepods-logo-dark.png'}
@@ -1364,6 +1517,13 @@ export function DashboardView({
         onAnswerTicket={handleAnswerTicket}
         onInspectRisk={(cust) => setSelectedCustomerForRisk(cust)}
         onApproveSettlement={handleApproveSettlement}
+      />
+
+      {/* Record Payment Modal (payment type + note) */}
+      <MarkPaidModal
+        invoice={selectedInvoiceForMarkPaid}
+        onClose={() => setSelectedInvoiceForMarkPaid(null)}
+        onConfirmMarkPaid={handleConfirmMarkPaid}
       />
 
       {/* Wire Remittance Proof Modal */}

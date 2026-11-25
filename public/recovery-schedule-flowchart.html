@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Channel-wise Recovery Schedule</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --paper: #f4f7fb;
+      --line: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 500px at 12% -10%, #e0e7ff 0%, transparent 60%),
+        radial-gradient(800px 500px at 95% 5%, #dcfce7 0%, transparent 55%),
+        var(--paper);
+    }
+
+    .wrap {
+      width: min(760px, 100% - 32px);
+      margin: 0 auto;
+      padding: 48px 0 72px;
+    }
+
+    /* ---------- Header ---------- */
+    .head {
+      position: relative;
+      overflow: hidden;
+      padding: 28px 30px;
+      border-radius: 22px;
+      color: #fff;
+      background: linear-gradient(125deg, #0f172a, #1e293b 55%, #0f172a);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, .22);
+      animation: rise .7s cubic-bezier(.2, .8, .2, 1) both;
+    }
+    .head::after {
+      content: "";
+      position: absolute;
+      inset: -60%;
+      background: conic-gradient(from 0deg, transparent 0 200deg, rgba(96, 165, 250, .28) 260deg, rgba(74, 222, 128, .22) 310deg, transparent 360deg);
+      animation: spin 12s linear infinite;
+      pointer-events: none;
+    }
+    .head > * { position: relative; z-index: 1; }
+
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: #93c5fd;
+      margin: 0 0 8px;
+    }
+    h1 { margin: 0; font-size: clamp(22px, 4vw, 32px); letter-spacing: -.03em; }
+    .sub { margin: 8px 0 0; color: #cbd5e1; font-size: 14px; }
+
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+    .meta span {
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .09);
+      border: 1px solid rgba(255, 255, 255, .16);
+      font-size: 12px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .meta b { color: #fff; }
+
+    /* ---------- Flow ---------- */
+    .flow { margin-top: 34px; }
+
+    .step {
+      animation: rise .6s cubic-bezier(.2, .8, .2, 1) both;
+      animation-delay: calc(var(--i) * .11s + .12s);
+    }
+
+    .card {
+      --c1: #2563eb;
+      --c2: #60a5fa;
+      --base: #dbeafe;
+      --chip: #eff6ff;
+      --chipText: #1d4ed8;
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      padding: 2px;
+      border-radius: 17px;
+      background: var(--base);
+      box-shadow: 0 8px 22px rgba(15, 23, 42, .07);
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 32px rgba(15, 23, 42, .13);
+    }
+
+    /* moving gradient ring */
+    .card::before {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      inset: -110%;
+      background:
+        conic-gradient(from 0deg,
+          transparent 0deg,
+          var(--c2) 70deg,
+          var(--c1) 120deg,
+          transparent 190deg 360deg),
+        var(--base);
+      animation: spin var(--speed, 4s) linear infinite;
+    }
+    .flow > .step:nth-child(4n + 3) .card::before { animation-direction: reverse; }
+
+    .card__inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 62px 1fr auto;
+      align-items: center;
+      gap: 16px;
+      min-height: 78px;
+      padding: 15px 20px;
+      border-radius: 15px;
+      background: #fff;
+    }
+
+    .day {
+      display: grid;
+      place-items: center;
+      width: 52px;
+      height: 52px;
+      border-radius: 13px;
+      background: var(--chip);
+      color: var(--chipText);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+
+    .body { min-width: 0; }
+    .label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--chip);
+      color: var(--chipText);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+    .label svg { width: 12px; height: 12px; }
+    .title {
+      margin: 7px 0 0;
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: -.01em;
+    }
+
+    .date { text-align: right; }
+    .date b { display: block; font-size: 13px; font-weight: 700; white-space: nowrap; }
+    .date small { color: var(--muted); font-size: 11px; }
+
+    /* ---------- Connectors ---------- */
+    .connector {
+      --flow1: #3b82f6;
+      --flow2: #93c5fd;
+      height: 58px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: fade .5s ease both;
+      animation-delay: calc(var(--i) * .11s + .35s);
+    }
+    .connector__line {
+      position: relative;
+      flex: 1;
+      width: 3px;
+      overflow: hidden;
+      border-radius: 3px;
+      background: var(--line);
+    }
+    .connector__line::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -70%;
+      height: 70%;
+      border-radius: 3px;
+      background: linear-gradient(180deg, transparent, var(--flow1), var(--flow2), transparent);
+      filter: drop-shadow(0 0 4px var(--flow1));
+      animation: flowDown 1.35s linear infinite;
+    }
+    .connector__arrow {
+      width: 0;
+      height: 0;
+      margin-top: -1px;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 9px solid var(--flow1);
+      filter: drop-shadow(0 0 5px var(--flow2));
+      animation: throb 1.35s ease-in-out infinite;
+    }
+
+    /* ---------- Legend + controls ---------- */
+    .foot {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 30px;
+      animation: fade .8s ease 1.3s both;
+    }
+    .legend { display: flex; flex-wrap: wrap; gap: 18px; }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--dot);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--dot) 18%, transparent);
+      animation: throb 1.8s ease-in-out infinite;
+    }
+    button {
+      padding: 9px 15px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
+      transition: background .2s ease, border-color .2s ease;
+    }
+    button:hover { background: #f8fafc; border-color: #cbd5e1; }
+
+    /* ---------- Channel palettes ---------- */
+    .email { --c1:#2563eb; --c2:#93c5fd; --base:#dbeafe; --chip:#eff6ff; --chipText:#1d4ed8; --flow1:#3b82f6; --flow2:#bfdbfe; --speed:4.2s; }
+    .wa    { --c1:#15803d; --c2:#86efac; --base:#dcfce7; --chip:#f0fdf4; --chipText:#15803d; --flow1:#22c55e; --flow2:#bbf7d0; --speed:4.8s; }
+    .call  { --c1:#c2410c; --c2:#fdba74; --base:#ffedd5; --chip:#fff7ed; --chipText:#c2410c; --flow1:#f97316; --flow2:#fed7aa; --speed:5.2s; }
+
+    /* ---------- Animations ---------- */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes rise { from { opacity: 0; transform: translateY(18px) scale(.985); } to { opacity: 1; transform: none; } }
+    @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes flowDown { from { transform: translateY(0); } to { transform: translateY(242.9%); } }
+    @keyframes throb { 0%, 100% { opacity: .65; transform: scale(.92); } 50% { opacity: 1; transform: scale(1.08); } }
+
+    body.paused *, body.paused *::before, body.paused *::after {
+      animation-play-state: paused !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+
+    @media (max-width: 560px) {
+      .wrap { padding-top: 24px; }
+      .card__inner { grid-template-columns: 52px 1fr; gap: 12px; }
+      .day { width: 44px; height: 44px; font-size: 12px; }
+      .date { grid-column: 2; text-align: left; margin-top: -6px; }
+      .title { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="head">
+      <p class="eyebrow">Saved sequence · 8 steps</p>
+      <h1>Channel-wise Recovery Schedule</h1>
+      <p class="sub">A multi-channel cadence from first reminder to final touch.</p>
+      <div class="meta">
+        <span>Due <b>16 Dec 2026</b></span>
+        <span>First touch <b>Thu, 17 Dec 2026</b></span>
+        <span>Window <b>D1 – D30</b></span>
+      </div>
+    </header>
+
+    <section class="flow" aria-label="Recovery schedule sequence">
+
+      <div class="step" style="--i:0">
+        <article class="card email">
+          <div class="card__inner">
+            <div class="day">D1</div>
+            <div class="body">
+              <span class="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+                Email
+              </span>
+              <p class="title">Email 1: Payment Reminder</p>
+            </div>
+            <div class="date"><b>Thu, 17 Dec 2026</b><small>Step 1 of 8</small></div>
+          </div>
+        </article>
+      </div>
+      <div class="connector wa" style="--i:0" aria-hidden="true"><div class="connector__line"></div><div class="connector__arrow"></div></div>
+
+      <div class="step" style="--i:1">
+        <article class="card wa">
+          <div class="card__inner">
+            <div class="day">D4</div>
+            <div class="body">
+              <span class="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/></svg>
+                WhatsApp
+              </span>
+              <p class="title">WhatsApp 1: Quick Touch</p>
+            </div>
+            <div class="date"><b>Sun, 20 Dec 2026</b><small>Step 2 of 8</small></div>
+          </div>
+        </article>
+      </div>
+      <div class="connector email" style="--i:1" aria-hidden="true"><div class="connector__line"></div><div class="connector__arrow"></div></div>
+
+      <div class="step" style="--i:2">
+        <article class="card email">
+          <div class="card__inner">
+            <div class="day">D8</div>
+            <div class="body">
+              <span class="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+                Email
+              </span>
+              <p class="title">Email 2: Payment Reminder</p>
+            </div>
+            <div class="date"><b>Thu, 24 Dec 2026</b><small>Step 3 of 8</small></div>
+          </div>
+        </article>
+      </div>
+      <div class="connector call" style="--i:2" aria-hidden="true"><div class="connector__line"></div><div class="connector__arrow"></div></div>
+
+      <div class="step" style="--i:3">
+        <article class="card call">
+          <div class="card__inner">
+            <div class="day">D12</div>
+            <div class="body">
+              <span class="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.1 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>
+                Call
+              </span>
+              <p class="title">Call 1: Payment Confirmation</p>
+            </div>
+            <div class="date"><b>Mon, 28 Dec 2026</b><small>Step 4 of 8</small></div>
+          </div>
+        </article>
+      </div>
+      <div class="connector wa" style="--i:3" aria-hidden="true"><div class="connector__line"></div><div class="connector__arrow"></div></div>
+
+      <div class="step" style="--i:4">
+        <article class="card wa">
+          <div class="card__inner">
+            <div class="day">D16</div>
+            <div class="body">
+              <span class="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/></svg>
+                WhatsApp
+              </span>
+              <p class="title">WhatsApp 2: Quick Touch</p>
+            </div>
+            <div class="date"><b>Fri, 01 Jan 2027</b><small>Step 5 of 8</small></div>
+          </div>
+        </article>
+      </div>
+      <div class="connector email" style="--i:4" aria-hidden="true"><div class="connector__line"></div><div class="connector__arrow"></div></div>
+
+      <div class="step" style="--i:5">
+        <article class="card email">
+          <div class="card__inner">
+            <div class="day">D21</div>
+            <div class="body">
+              <span class="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+                Email
+              </span>
+              <p class="title">Email 3: Payment Reminder</p>
+            </div>
+            <div class="date"><b>Wed, 06 Jan 2027</b><small>Step 6 of 8</small></div>
+          </div>
+        </article>
+      </div>
+      <div class="connector call" style="--i:5" aria-hidden="true"><div class="connector__line"></div><div class="connector__arrow"></div></div>
+
+      <div class="step" style="--i:6">
+        <article class="card call">
+          <div class="card__inner">
+            <div class="day">D26</div>
+            <div class="body">
+              <span class="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.1 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>
+                Call
+              </span>
+              <p class="title">Call 2: Payment Confirmation</p>
+            </div>
+            <div class="date"><b>Mon, 11 Jan 2027</b><small>Step 7 of 8</small></div>
+          </div>
+        </article>
+      </div>
+      <div class="connector wa" style="--i:6" aria-hidden="true"><div class="connector__line"></div><div class="connector__arrow"></div></div>
+
+      <div class="step" style="--i:7">
+        <article class="card wa">
+          <div class="card__inner">
+            <div class="day">D30</div>
+            <div class="body">
+              <span class="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/></svg>
+                WhatsApp
+              </span>
+              <p class="title">WhatsApp 3: Quick Touch</p>
+            </div>
+            <div class="date"><b>Fri, 15 Jan 2027</b><small>Step 8 of 8</small></div>
+          </div>
+        </article>
+      </div>
+
+    </section>
+
+    <footer class="foot">
+      <div class="legend">
+        <span><i class="dot" style="--dot:#3b82f6"></i> Email</span>
+        <span><i class="dot" style="--dot:#22c55e"></i> WhatsApp</span>
+        <span><i class="dot" style="--dot:#f97316"></i> Call</span>
+      </div>
+      <button id="toggle" type="button" aria-pressed="false">Pause animation</button>
+    </footer>
+  </main>
+
+  <script>
+    const btn = document.getElementById('toggle');
+    btn.addEventListener('click', () => {
+      const paused = document.body.classList.toggle('paused');
+      btn.setAttribute('aria-pressed', String(paused));
+      btn.textContent = paused ? 'Resume animation' : 'Pause animation';
+    });
+  </script>
+</body>
+</html>

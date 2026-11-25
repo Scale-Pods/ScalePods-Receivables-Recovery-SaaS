@@ -10,8 +10,9 @@ const supabaseUrl =
   import.meta.env.SUPABASE_URL || 
   '';
 
+// Pricing is never read with this client: recovery_plan_limits.Price comes
+// only from the server-side /api/plan-limits endpoint.
 const supabaseKey = 
-  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 
   import.meta.env.SUPABASE_SERVICE_ROLE_KEY || 
   import.meta.env.VITE_SUPABASE_ANON_KEY || 
   import.meta.env.SUPABASE_ANON_KEY || 

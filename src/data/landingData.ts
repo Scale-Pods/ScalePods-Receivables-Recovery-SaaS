@@ -30,6 +30,8 @@ export interface PricingPlan {
   features: string[];
   ctaLabel: string;
   isCustomPrice?: boolean;
+  /** Optional display override populated from recovery_plan_limits.Price. */
+  priceLabel?: string;
 }
 
 export interface FaqItem {

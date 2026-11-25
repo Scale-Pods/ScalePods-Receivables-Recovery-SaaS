@@ -19,6 +19,7 @@ import {
   PlanTier,
   PaymentRecord
 } from '../types/dashboard';
+import { InfoHint } from '@/components/ui/info-hint';
 import { formatINR } from '../utils/formatters';
 import { CompanyAvatar } from './CompanyAvatar';
 import { CustomerRiskExplainerModal } from './CustomerRiskExplainerModal';
@@ -258,7 +259,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
       </div>
 
       {/* Top Filter & Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white dark:bg-[#0D0E15] p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800">
+      <div className="dashboard-card flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5">
         
         {/* Bucket filter buttons */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
@@ -337,12 +338,14 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
           >
             <ArrowUpDown className="w-3.5 h-3.5" />
           </button>
+
+          <InfoHint text="Source: rows are pulled from the logged-in account's invoice ledger. Counts above reflect the current active/settled view and selected ageing bucket." />
         </div>
 
       </div>
 
       {/* Structured Customer Ledger Table */}
-      <div className="rounded-xl border border-slate-200/90 dark:border-zinc-800 bg-white dark:bg-[#0D0E15] shadow-[0_1px_3px_rgba(0,0,0,0.03),0_8px_24px_rgba(124,58,237,0.03)] overflow-hidden">
+      <div className="dashboard-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -449,6 +452,11 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                             <div className="text-[11px] text-zinc-500 font-mono mt-0.5 truncate">
                               Ref: {payments.find((p) => p.invoiceId === inv.id || p.invoiceNumber === inv.invoiceNumber)?.bankReference || 'Confirmed & Cleared'}
                             </div>
+                            {payments.find((p) => p.invoiceId === inv.id || p.invoiceNumber === inv.invoiceNumber)?.paymentNote && (
+                              <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate" title={payments.find((p) => p.invoiceId === inv.id || p.invoiceNumber === inv.invoiceNumber)?.paymentNote}>
+                                Note: {payments.find((p) => p.invoiceId === inv.id || p.invoiceNumber === inv.invoiceNumber)?.paymentNote}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div>

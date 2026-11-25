@@ -14,10 +14,17 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* shadcn-style aliases */
+    "paths": {
+      "@/components": ["./components"],
+      "@/components/*": ["./components/*"],
+      "@/*": ["./src/*"]
+    },
+
     /* Linting */
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src", "components"]
 }

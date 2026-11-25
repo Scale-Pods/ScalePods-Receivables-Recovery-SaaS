@@ -1,33 +1,406 @@
-import React, { useState } from 'react';
-import { 
-  Mail, 
-  MessageSquare, 
-  PhoneCall, 
-  Plus, 
-  Trash2, 
-  RotateCcw, 
-  Check, 
-  Sliders, 
-  X, 
-  Clock,
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Flame,
+  Lock,
+  Mail,
+  MessageSquare,
+  Minus,
+  PhoneCall,
+  Plus,
   Save,
-  Loader2
+  Sliders,
+  Sparkles,
+  Trash2,
+  type LucideIcon,
 } from 'lucide-react';
 import { PlanTier } from '../types/dashboard';
 import { UserAccount } from '../../types/auth';
-import { sendSequenceCustomizationWebhook } from '../../lib/webhook';
+import { saveSequenceToSupabase } from '../../lib/invoiceWorkflow';
+import { fetchPlanLimits, getPlanRow, type PlanLimitRow } from '../../lib/planLimits';
+
+export type SequenceChannel = 'email' | 'whatsapp' | 'voice';
+export type SequenceType = 'light' | 'standard' | 'intensive' | 'custom';
 
 export interface SequenceDayStep {
   id: string;
+  /** Positive days are overdue days; negative days are weeks before the due date. */
   day: number;
+  phase?: 'before_due' | 'after_due';
   stage: string;
-  channels: ('email' | 'whatsapp' | 'voice')[];
+  channels: SequenceChannel[];
   tone: 'Friendly' | 'Firm' | 'Priority' | 'Urgent' | 'Human Review';
   headline: string;
   copyPreview: string;
   voiceScript?: string;
   triggerRules: string[];
 }
+
+interface SequenceTemplateStep {
+  id: string;
+  day: number;
+  channel: SequenceChannel;
+}
+
+interface ChannelCounts {
+  email: number;
+  whatsapp: number;
+  voice: number;
+}
+
+interface SequenceCapabilities {
+  channels: Record<SequenceChannel, boolean>;
+  types: Record<'light' | 'standard' | 'intensive', boolean>;
+  custom: boolean;
+  maxDays: number;
+}
+
+interface SequencePreset {
+  id: Exclude<SequenceType, 'custom'>;
+  label: string;
+  description: string;
+  requiredTier: PlanTier;
+  icon: LucideIcon;
+  accent: string;
+  steps: SequenceTemplateStep[];
+}
+
+const STORAGE_KEY_CUSTOM_SEQUENCE = 'recovr_custom_sequence';
+const STORAGE_KEY_TOTAL_DAYS = 'recovr_sequence_total_days';
+const MAX_TOUCHES_PER_CHANNEL = 10;
+/** How many weeks before the due date a customer can schedule pre-due reachouts. */
+const PRE_DUE_WEEK_OPTIONS = [0, 1, 2, 3] as const;
+/** Pre-due channel mix per week by plan tier; the mix repeats for each selected week. */
+function preDueChannelMix(tier: PlanTier): SequenceChannel[] {
+  if (tier === 'free') return ['email', 'email', 'email'];
+  if (tier === 'basic') return ['email', 'email', 'whatsapp'];
+  return ['email', 'whatsapp', 'voice'];
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+const CHANNEL_META: Array<{
+  id: SequenceChannel;
+  label: string;
+  shortLabel: string;
+  icon: LucideIcon;
+  requiredTier: PlanTier;
+}> = [
+  { id: 'email', label: 'Email', shortLabel: 'Email', icon: Mail, requiredTier: 'free' },
+  { id: 'whatsapp', label: 'WhatsApp', shortLabel: 'WhatsApp', icon: MessageSquare, requiredTier: 'basic' },
+  { id: 'voice', label: 'Call', shortLabel: 'Call', icon: PhoneCall, requiredTier: 'growth' },
+];
+
+interface NumberStepperProps {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  label: string;
+  compact?: boolean;
+}
+
+const NumberStepper: React.FC<NumberStepperProps> = ({
+  value,
+  min,
+  max,
+  onChange,
+  label,
+  compact,
+}) => {
+  const [draft, setDraft] = useState(String(value));
+  const rootRef = useRef<HTMLDivElement>(null);
+  const wheelAccumulator = useRef(0);
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const parsed = Number(draft);
+    const next = clamp(Number.isFinite(parsed) && draft.trim() !== '' ? Math.round(parsed) : value, min, max);
+    setDraft(String(next));
+    if (next !== value) onChange(next);
+  };
+
+  const step = (delta: number) => {
+    const next = clamp(value + delta, min, max);
+    setDraft(String(next));
+    if (next !== value) onChange(next);
+  };
+
+  useEffect(() => {
+    const node = rootRef.current;
+    if (!node) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      wheelAccumulator.current += event.deltaY;
+      if (Math.abs(wheelAccumulator.current) < 16) return;
+
+      const direction = wheelAccumulator.current > 0 ? -1 : 1;
+      wheelAccumulator.current = 0;
+      const next = clamp(value + direction, min, max);
+      if (next === value) return;
+
+      event.preventDefault();
+      step(direction);
+    };
+
+    node.addEventListener('wheel', handleWheel, { passive: false });
+    return () => node.removeEventListener('wheel', handleWheel);
+  }, [value, min, max, step]);
+
+  return (
+    <div
+      ref={rootRef}
+      title={`Scroll to adjust ${label.toLowerCase()}`}
+      className={`inline-flex items-center overflow-hidden rounded-xl border border-purple-500/25 bg-white/85 shadow-sm transition-colors focus-within:border-purple-500 dark:border-purple-400/20 dark:bg-zinc-900/75 ${
+        compact ? 'h-9' : 'h-10'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => step(-1)}
+        disabled={value <= min}
+        aria-label={`Decrease ${label}`}
+        className="flex h-full w-8 items-center justify-center border-r border-purple-500/15 text-zinc-500 transition-colors hover:bg-recovr-button/10 hover:text-recovr-button disabled:cursor-not-allowed disabled:opacity-30 dark:border-purple-400/10 dark:text-zinc-400 dark:hover:text-purple-300"
+      >
+        <Minus className="h-3.5 w-3.5" />
+      </button>
+      <input
+        type="number"
+        inputMode="numeric"
+        value={draft}
+        min={min}
+        max={max}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commit();
+            event.currentTarget.blur();
+          }
+        }}
+        aria-label={label}
+        className="h-full w-12 bg-transparent text-center font-mono text-xs font-bold text-zinc-900 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:text-white"
+      />
+      <button
+        type="button"
+        onClick={() => step(1)}
+        disabled={value >= max}
+        aria-label={`Increase ${label}`}
+        className="flex h-full w-8 items-center justify-center border-l border-purple-500/15 text-zinc-500 transition-colors hover:bg-recovr-button/10 hover:text-recovr-button disabled:cursor-not-allowed disabled:opacity-30 dark:border-purple-400/10 dark:text-zinc-400 dark:hover:text-purple-300"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+};
+
+interface ChannelSelectProps {
+  value: SequenceChannel;
+  options: SequenceChannel[];
+  counts: ChannelCounts;
+  onChange: (value: SequenceChannel) => void;
+  label: string;
+}
+
+const ChannelSelect: React.FC<ChannelSelectProps> = ({ value, options, counts, onChange, label }) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const wheelAccumulator = useRef(0);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const node = rootRef.current;
+    if (!node || open || options.length < 2) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      wheelAccumulator.current += event.deltaY;
+      if (Math.abs(wheelAccumulator.current) < 16) return;
+
+      const direction = wheelAccumulator.current > 0 ? 1 : -1;
+      wheelAccumulator.current = 0;
+
+      const currentIndex = Math.max(0, options.indexOf(value));
+      let next: SequenceChannel | null = null;
+      for (let offset = 1; offset <= options.length; offset += 1) {
+        const index = (currentIndex + direction * offset + options.length) % options.length;
+        const candidate = options[index];
+        if (candidate === value) break;
+        if (counts[candidate] < MAX_TOUCHES_PER_CHANNEL) {
+          next = candidate;
+          break;
+        }
+      }
+      if (!next) return;
+
+      event.preventDefault();
+      onChange(next);
+    };
+
+    node.addEventListener('wheel', handleWheel, { passive: false });
+    return () => node.removeEventListener('wheel', handleWheel);
+  }, [open, options, value, counts, onChange]);
+
+  const selectedMeta = CHANNEL_META.find((meta) => meta.id === value)!;
+  const SelectedIcon = selectedMeta.icon;
+
+  return (
+    <div ref={rootRef} title="Scroll to change channel" className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={label}
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-purple-500/25 bg-white/85 px-2.5 text-xs font-bold text-zinc-800 shadow-sm transition-colors hover:border-purple-500 focus:border-purple-500 focus:outline-none dark:border-purple-400/20 dark:bg-zinc-900/75 dark:text-zinc-100"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <SelectedIcon className="h-3.5 w-3.5 shrink-0 text-purple-600 dark:text-purple-300" />
+          <span className="truncate">{selectedMeta.shortLabel}</span>
+        </span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={label}
+          className="absolute left-0 right-0 top-full z-40 mt-1 overflow-hidden rounded-xl border border-purple-500/25 bg-white/95 p-1 shadow-xl backdrop-blur-md dark:border-purple-400/20 dark:bg-zinc-900/95"
+        >
+          {options.map((id) => {
+            const meta = CHANNEL_META.find((item) => item.id === id)!;
+            const Icon = meta.icon;
+            const selected = id === value;
+            const maxed = counts[id] >= MAX_TOUCHES_PER_CHANNEL && !selected;
+
+            return (
+              <button
+                key={id}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                disabled={maxed}
+                onClick={() => {
+                  onChange(id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] font-semibold transition-colors ${
+                  selected
+                    ? 'bg-recovr-button text-white'
+                    : 'text-zinc-700 hover:bg-purple-500/10 hover:text-purple-700 dark:text-zinc-200 dark:hover:text-purple-300'
+                } ${maxed ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+              >
+                <Icon className={`h-3.5 w-3.5 shrink-0 ${selected ? 'text-white' : 'text-purple-600 dark:text-purple-300'}`} />
+                <span className="truncate">{meta.label}</span>
+                {maxed && <span className="ml-auto text-[9px] font-mono">max</span>}
+                {selected && <Check className="ml-auto h-3 w-3 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PRESETS: SequencePreset[] = [
+  {
+    id: 'light',
+    label: 'Light Sequence',
+    description: 'Low-frequency follow-ups with sufficient gaps between communications.',
+    requiredTier: 'free',
+    icon: Sparkles,
+    accent: 'violet',
+    steps: [
+      { id: 'light-1', day: 1, channel: 'email' },
+      { id: 'light-4', day: 4, channel: 'whatsapp' },
+      { id: 'light-8', day: 8, channel: 'email' },
+      { id: 'light-12', day: 12, channel: 'voice' },
+      { id: 'light-16', day: 16, channel: 'whatsapp' },
+      { id: 'light-21', day: 21, channel: 'email' },
+      { id: 'light-26', day: 26, channel: 'voice' },
+      { id: 'light-30', day: 30, channel: 'whatsapp' },
+    ],
+  },
+  {
+    id: 'standard',
+    label: 'Standard Sequence',
+    description: 'Balanced communication across all three channels.',
+    requiredTier: 'basic',
+    icon: Mail,
+    accent: 'indigo',
+    steps: [
+      { id: 'standard-1', day: 1, channel: 'email' },
+      { id: 'standard-3', day: 3, channel: 'whatsapp' },
+      { id: 'standard-5', day: 5, channel: 'voice' },
+      { id: 'standard-7', day: 7, channel: 'email' },
+      { id: 'standard-10', day: 10, channel: 'whatsapp' },
+      { id: 'standard-13', day: 13, channel: 'voice' },
+      { id: 'standard-16', day: 16, channel: 'email' },
+      { id: 'standard-19', day: 19, channel: 'whatsapp' },
+      { id: 'standard-22', day: 22, channel: 'voice' },
+      { id: 'standard-25', day: 25, channel: 'email' },
+      { id: 'standard-28', day: 28, channel: 'whatsapp' },
+      { id: 'standard-30', day: 30, channel: 'voice' },
+    ],
+  },
+  {
+    id: 'intensive',
+    label: 'Intense Sequence',
+    description: 'Frequent communication for overdue and high-priority receivables.',
+    requiredTier: 'growth',
+    icon: Flame,
+    accent: 'orange',
+    steps: [
+      { id: 'intense-1', day: 1, channel: 'email' },
+      { id: 'intense-2', day: 2, channel: 'whatsapp' },
+      { id: 'intense-3', day: 3, channel: 'voice' },
+      { id: 'intense-5', day: 5, channel: 'email' },
+      { id: 'intense-6', day: 6, channel: 'whatsapp' },
+      { id: 'intense-7', day: 7, channel: 'voice' },
+      { id: 'intense-9', day: 9, channel: 'email' },
+      { id: 'intense-10', day: 10, channel: 'whatsapp' },
+      { id: 'intense-11', day: 11, channel: 'voice' },
+      { id: 'intense-13', day: 13, channel: 'email' },
+      { id: 'intense-14', day: 14, channel: 'whatsapp' },
+      { id: 'intense-15', day: 15, channel: 'voice' },
+      { id: 'intense-17', day: 17, channel: 'email' },
+      { id: 'intense-18', day: 18, channel: 'whatsapp' },
+      { id: 'intense-19', day: 19, channel: 'voice' },
+      { id: 'intense-21', day: 21, channel: 'email' },
+      { id: 'intense-23', day: 23, channel: 'whatsapp' },
+      { id: 'intense-25', day: 25, channel: 'voice' },
+      { id: 'intense-27', day: 27, channel: 'email' },
+      { id: 'intense-29', day: 29, channel: 'whatsapp' },
+      { id: 'intense-30', day: 30, channel: 'voice' },
+    ],
+  },
+];
 
 export const default21DaySequence: SequenceDayStep[] = [
   {
@@ -41,89 +414,6 @@ export const default21DaySequence: SequenceDayStep[] = [
     triggerRules: ['Sent post-grace period', 'Stops instantly on Razorpay/bank webhook'],
   },
   {
-    id: 'step-3',
-    day: 3,
-    stage: 'Friendly',
-    channels: ['whatsapp'],
-    tone: 'Friendly',
-    headline: 'WhatsApp Quick-Touch',
-    copyPreview: 'Namaste {{customer_name}}, invoice {{invoice_number}} (₹{{amount}}) is 3 days overdue. Tap here to pay via UPI/Cards: {{razorpay_link}}. Reply "PAID" to hold.',
-    triggerRules: ['WhatsApp opt-in verified', '"PAID" reply triggers 3-day verification hold'],
-  },
-  {
-    id: 'step-5',
-    day: 5,
-    stage: 'Friendly',
-    channels: ['email'],
-    tone: 'Friendly',
-    headline: 'GST Statement & Reconciliation Check-in',
-    copyPreview: 'Dear {{customer_name}}, attached is GST invoice {{invoice_number}}. Please confirm if this is awaiting ERP approval so we can assist.',
-    triggerRules: ['Includes GSTIN & PO reference', 'Debtor questions create owner ticket'],
-  },
-  {
-    id: 'step-8',
-    day: 8,
-    stage: 'Firm',
-    channels: ['email', 'whatsapp'],
-    tone: 'Firm',
-    headline: 'Day 8 (15+ Bucket Entry)',
-    copyPreview: 'Invoice {{invoice_number}} (₹{{amount}}) is 8 days overdue. Please remit today via {{razorpay_link}} or upload NEFT/RTGS UTR proof.',
-    triggerRules: ['15+ bucket starting point', 'Bank UTR proof upload enabled'],
-  },
-  {
-    id: 'step-10',
-    day: 10,
-    stage: 'Firm',
-    channels: ['whatsapp'],
-    tone: 'Firm',
-    headline: 'Instalment Offer',
-    copyPreview: 'Hi {{customer_name}}, if full settlement is difficult this week, would a two-part NEFT instalment assist? Reply to confirm dates.',
-    triggerRules: ['Date promises captured automatically', 'Pauses until promise date'],
-  },
-  {
-    id: 'step-12',
-    day: 12,
-    stage: 'Escalation',
-    channels: ['voice', 'whatsapp'],
-    tone: 'Priority',
-    headline: 'Day 12 (30+ Bucket Entry): Voice AI Call',
-    copyPreview: 'Priority voice call to Accounts Payable, followed by WhatsApp summary of call outcome with UPI payment link.',
-    voiceScript: 'Namaste, this is the automated accounts assistant regarding invoice {{invoice_number}} for ₹{{amount}}. May I confirm if payment is scheduled this week?',
-    triggerRules: ['Strict 9:00 AM – 7:00 PM IST window', '30+ bucket starting point'],
-  },
-  {
-    id: 'step-14',
-    day: 14,
-    stage: 'Escalation',
-    channels: ['email', 'whatsapp'],
-    tone: 'Priority',
-    headline: 'Credit Terms Review Notice',
-    copyPreview: 'Notice: Invoice {{invoice_number}} (₹{{amount}}) is 14 days overdue. Unsettled balance may impact commercial credit terms.',
-    triggerRules: ['Dashboard alert triggered', 'Factual and verified details only'],
-  },
-  {
-    id: 'step-17',
-    day: 17,
-    stage: 'Final Blitz',
-    channels: ['voice', 'whatsapp', 'email'],
-    tone: 'Urgent',
-    headline: 'Day 17 (60+ Bucket Entry): Daily Blitz',
-    copyPreview: 'URGENT: Invoice {{invoice_number}} (₹{{amount}}) is 17 days past due. Daily outreach active. Remit via UPI / NetBanking: {{razorpay_link}}.',
-    voiceScript: 'Good morning, urgent escalation call regarding pending balance of ₹{{amount}} for invoice {{invoice_number}}. Please remit today.',
-    triggerRules: ['60+ bucket starting point', 'Daily voice calls on Days 17–21'],
-  },
-  {
-    id: 'step-19',
-    day: 19,
-    stage: 'Final Blitz',
-    channels: ['voice', 'whatsapp'],
-    tone: 'Urgent',
-    headline: 'Executive Escalation Notice',
-    copyPreview: 'Notice: 48 hours remaining before autonomous cadence concludes and moves to owner review. Pay now: {{razorpay_link}}',
-    voiceScript: 'Outstanding balance of ₹{{amount}} under invoice {{invoice_number}} will conclude autonomous sequence in 48 hours.',
-    triggerRules: ['1 touch per channel per day limit', 'Audit ledger logs call'],
-  },
-  {
     id: 'step-21',
     day: 21,
     stage: 'Final Blitz',
@@ -134,22 +424,182 @@ export const default21DaySequence: SequenceDayStep[] = [
     voiceScript: 'Final automated notification. 21-day recovery sequence is concluding. Please remit via {{razorpay_link}}.',
     triggerRules: ['Autonomous sequence concludes', 'Moves to Approvals tab for Human Approval'],
   },
-  {
-    id: 'step-22',
-    day: 22,
-    stage: 'Human Review',
-    channels: ['email'],
-    tone: 'Human Review',
-    headline: 'Day 22: Human Approval Required',
-    copyPreview: 'Autonomous outreach halts. The invoice moves directly to the Approvals tab with "Overdue 22 Days Over" for human review and approval.',
-    triggerRules: ['Human approval required', 'Outreach paused until human approval granted'],
-  },
 ];
 
-const STORAGE_KEY_CUSTOM_SEQUENCE = 'recovr_custom_sequence';
-const STORAGE_KEY_TOTAL_DAYS = 'recovr_sequence_total_days';
+function planNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.round(value);
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace(/[^\d.-]/g, ''));
+    if (Number.isFinite(parsed)) return Math.round(parsed);
+  }
+  return null;
+}
 
-const getDefaultCopyForTone = (tone: SequenceDayStep['tone']): string => {
+function fallbackCapabilities(tier: PlanTier): SequenceCapabilities {
+  const maxDays = tier === 'enterprise' ? 90 : 30;
+  if (tier === 'free') {
+    return {
+      channels: { email: true, whatsapp: false, voice: false },
+      types: { light: true, standard: false, intensive: false },
+      custom: false,
+      maxDays,
+    };
+  }
+  if (tier === 'basic') {
+    return {
+      channels: { email: true, whatsapp: true, voice: false },
+      types: { light: true, standard: true, intensive: false },
+      custom: false,
+      maxDays,
+    };
+  }
+  return {
+    channels: { email: true, whatsapp: true, voice: true },
+    types: { light: true, standard: true, intensive: true },
+    custom: true,
+    maxDays,
+  };
+}
+
+function capabilitiesFromPlanRow(row: PlanLimitRow | undefined, tier: PlanTier): SequenceCapabilities {
+  const base = fallbackCapabilities(tier);
+  if (!row) return base;
+
+  return {
+    channels: {
+      email: row.email_enabled ?? base.channels.email,
+      whatsapp: row.whatsapp_enabled ?? base.channels.whatsapp,
+      voice: row.ai_calls_enabled ?? base.channels.voice,
+    },
+    types: {
+      light: row.light_sequence_enabled ?? base.types.light,
+      standard: row.standard_sequence_enabled ?? base.types.standard,
+      intensive: row.intensive_sequence_enabled ?? base.types.intensive,
+    },
+    custom: row.editable_sequence_enabled ?? base.custom,
+    // Presets are fixed 30-day templates, so the effective floor is 30 days.
+    maxDays: Math.max(30, clamp(planNumber(row.max_sequence_days) ?? base.maxDays, 1, 180)),
+  };
+}
+
+function filterStepsForCaps(steps: SequenceTemplateStep[], caps: SequenceCapabilities): SequenceTemplateStep[] {
+  return steps.filter((step) => caps.channels[step.channel]);
+}
+
+function limitChannelCounts(steps: SequenceTemplateStep[]): SequenceTemplateStep[] {
+  const seen: ChannelCounts = { email: 0, whatsapp: 0, voice: 0 };
+  return steps.filter((step) => {
+    if (seen[step.channel] >= MAX_TOUCHES_PER_CHANNEL) return false;
+    seen[step.channel] += 1;
+    return true;
+  });
+}
+
+function countSteps(steps: SequenceTemplateStep[]): ChannelCounts {
+  const counts: ChannelCounts = { email: 0, whatsapp: 0, voice: 0 };
+  for (const step of steps) counts[step.channel] += 1;
+  return counts;
+}
+
+function totalCount(counts: ChannelCounts): number {
+  return counts.email + counts.whatsapp + counts.voice;
+}
+
+function maxStepDay(steps: SequenceTemplateStep[]): number {
+  return steps.reduce((max, step) => Math.max(max, step.day), 1);
+}
+
+function sameSteps(a: SequenceTemplateStep[], b: SequenceTemplateStep[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort((x, y) => x.day - y.day);
+  const sortedB = [...b].sort((x, y) => x.day - y.day);
+  return sortedA.every((step, index) => step.day === sortedB[index].day && step.channel === sortedB[index].channel);
+}
+
+function stepsFromSequence(sequence: SequenceDayStep[]): SequenceTemplateStep[] {
+  return sequence
+    .filter((step) => step.day > 0)
+    .map((step, index) => ({
+      id: step.id || `custom-${index}`,
+      day: step.day,
+      channel: step.channels[0] || 'email',
+    }));
+}
+
+function formatStepTiming(day: number): string {
+  if (day > 0) return `Day ${day}`;
+  const weeks = Math.abs(day) / 7;
+  if (Number.isInteger(weeks) && weeks >= 1) {
+    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} before`;
+  }
+  return `${Math.abs(day)} days before`;
+}
+
+/**
+ * Repeats the tier's pre-due channel mix once per selected week. For example,
+ * 3 weeks prior on basic drafts 6 touches: 2 emails + 1 WhatsApp each week.
+ */
+function buildPreDueTemplateSteps(
+  weeks: number,
+  caps: SequenceCapabilities,
+  tier: PlanTier
+): SequenceTemplateStep[] {
+  if (weeks === 0) return [];
+  const mix = preDueChannelMix(tier).map((channel) => (caps.channels[channel] ? channel : 'email'));
+
+  return Array.from({ length: weeks }).flatMap((_, weekIndex) => {
+    const weeksPrior = weeks - weekIndex;
+    return mix.map((channel, position) => {
+      const day = -7 * weeksPrior + Math.floor((position * 7) / mix.length);
+      return { id: `pre-due-${Math.abs(day)}d-w${weeksPrior}-${position}`, day, channel };
+    });
+  });
+}
+
+function preDueWeeksFromSequence(sequence: SequenceDayStep[]): number {
+  const earliestDay = sequence.reduce((min, step) => Math.min(min, step.day), 0);
+  return clamp(Math.round(Math.abs(Math.min(0, earliestDay)) / 7), 0, 3);
+}
+
+function getPreDueHeadline(channel: SequenceChannel, weeks: number): string {
+  const subject =
+    weeks >= 3
+      ? 'Early payment reminder'
+      : weeks === 2
+        ? 'Advance payment reminder'
+        : 'Gentle payment heads-up';
+  if (channel === 'whatsapp') return `WhatsApp: ${subject}`;
+  if (channel === 'voice') return `Call: ${subject}`;
+  return `Email: ${subject}`;
+}
+
+function getPreDueCopy(channel: SequenceChannel, weeks: number): string {
+  if (channel === 'whatsapp') {
+    return 'Hi {{customer_name}}, a quick heads-up that invoice {{invoice_number}} for ₹{{amount}} is due on {{due_date}}. You can settle early via {{razorpay_link}}. Thank you!';
+  }
+  if (channel === 'voice') {
+    return 'Namaste, this is an advance reminder for invoice {{invoice_number}} for ₹{{amount}}, due on {{due_date}}. May I confirm the payment plan?';
+  }
+  if (weeks === 1) {
+    return 'Hi {{customer_name}}, invoice {{invoice_number}} for ₹{{amount}} is due on {{due_date}}. Just a friendly heads-up so you can plan the payment. Settle securely via {{razorpay_link}}. Thank you!';
+  }
+  if (weeks === 2) {
+    return 'Hi {{customer_name}}, a quick advance reminder that invoice {{invoice_number}} for ₹{{amount}} falls due on {{due_date}}. You can settle early via {{razorpay_link}}. Thank you!';
+  }
+  return 'Hi {{customer_name}}, looking ahead to invoice {{invoice_number}} for ₹{{amount}} due on {{due_date}}. Sharing the payment link {{razorpay_link}} in advance for your convenience.';
+}
+
+function recommendedPreset(tier: PlanTier, caps: SequenceCapabilities): SequencePreset {
+  const preferred: Exclude<SequenceType, 'custom'> =
+    tier === 'free' ? 'light' : tier === 'basic' ? 'standard' : 'intensive';
+  const ordered = [
+    PRESETS.find((preset) => preset.id === preferred)!,
+    ...PRESETS.filter((preset) => preset.id !== preferred),
+  ];
+  return ordered.find((preset) => caps.types[preset.id]) || PRESETS[0];
+}
+
+function getDefaultCopyForTone(tone: SequenceDayStep['tone']): string {
   switch (tone) {
     case 'Friendly':
       return 'Hi {{customer_name}}, this is a gentle reminder that invoice {{invoice_number}} for ₹{{amount}} is due on {{due_date}}. Please remit via {{razorpay_link}}. Thank you!';
@@ -159,14 +609,12 @@ const getDefaultCopyForTone = (tone: SequenceDayStep['tone']): string => {
       return 'Priority Notice: Invoice {{invoice_number}} (₹{{amount}}) is significantly overdue. Unsettled balance may impact commercial credit terms. Pay now: {{razorpay_link}}';
     case 'Urgent':
       return 'URGENT: Invoice {{invoice_number}} (₹{{amount}}) is past due. Daily outreach active. Remit via UPI / NetBanking: {{razorpay_link}}.';
-    case 'Human Review':
-      return 'Autonomous recovery cycle concludes. Invoice moved to internal executive review pending human approval.';
     default:
-      return 'Payment notice for invoice {{invoice_number}} (₹{{amount}}). Remit via {{razorpay_link}}.';
+      return 'Autonomous recovery cycle concludes. Invoice moved to internal executive review pending human approval.';
   }
-};
+}
 
-const getDefaultVoiceScriptForTone = (tone: SequenceDayStep['tone']): string => {
+function getDefaultVoiceScriptForTone(tone: SequenceDayStep['tone']): string {
   switch (tone) {
     case 'Friendly':
       return 'Namaste, this is an automated follow-up regarding invoice {{invoice_number}} for ₹{{amount}}. May I confirm if payment is scheduled?';
@@ -179,41 +627,74 @@ const getDefaultVoiceScriptForTone = (tone: SequenceDayStep['tone']): string => 
     default:
       return '';
   }
-};
+}
 
-const getStageForTone = (tone: SequenceDayStep['tone']): string => {
-  switch (tone) {
-    case 'Friendly':
-      return 'Friendly';
-    case 'Firm':
-      return 'Firm';
-    case 'Priority':
-      return 'Escalation';
-    case 'Urgent':
-      return 'Final Blitz';
-    case 'Human Review':
-      return 'Human Review';
-    default:
-      return 'Friendly';
-  }
-};
+function getStageForTone(tone: SequenceDayStep['tone']): string {
+  if (tone === 'Friendly' || tone === 'Firm') return tone;
+  if (tone === 'Priority') return 'Escalation';
+  if (tone === 'Urgent') return 'Final Blitz';
+  return 'Human Review';
+}
 
-const getHeadlineForTone = (tone: SequenceDayStep['tone'], day: number): string => {
-  switch (tone) {
-    case 'Friendly':
-      return `Day ${day}: Friendly Reminder`;
-    case 'Firm':
-      return `Day ${day}: Overdue Notice`;
-    case 'Priority':
-      return `Day ${day}: Priority Escalation`;
-    case 'Urgent':
-      return `Day ${day}: Final Blitz Notice`;
-    case 'Human Review':
-      return `Day ${day}: Human Review Required`;
-    default:
-      return `Day ${day}: Payment Notice`;
-  }
-};
+function getChannelHeadline(channel: SequenceChannel, index: number): string {
+  if (channel === 'email') return `Email ${index}: Payment Reminder`;
+  if (channel === 'whatsapp') return `WhatsApp ${index}: Quick Touch`;
+  return `Call ${index}: Payment Confirmation`;
+}
+
+function getChannelRules(channel: SequenceChannel): string[] {
+  if (channel === 'email') return ['Stops instantly on payment verification', 'Audit entry written to ledger'];
+  if (channel === 'whatsapp') return ['WhatsApp opt-in verified', '"PAID" reply pauses the cadence'];
+  return ['9:00 AM – 7:00 PM IST calling window', 'Call outcome logged to audit trail'];
+}
+
+function buildSequenceFromTemplateSteps(steps: SequenceTemplateStep[]): SequenceDayStep[] {
+  const sorted = [...steps].sort((a, b) => a.day - b.day);
+  if (sorted.length === 0) return [];
+
+  const countsByChannel: ChannelCounts = { email: 0, whatsapp: 0, voice: 0 };
+
+  return sorted.map((step, index) => {
+    countsByChannel[step.channel] += 1;
+
+    if (step.day < 0) {
+      const weeks = Math.max(1, Math.round(Math.abs(step.day) / 7));
+      const copyPreview = getPreDueCopy(step.channel, weeks);
+      return {
+        id: step.id,
+        day: step.day,
+        phase: 'before_due' as const,
+        stage: 'Pre-due',
+        channels: [step.channel],
+        tone: 'Friendly' as const,
+        headline: `${formatStepTiming(step.day)} due date: ${getPreDueHeadline(step.channel, weeks)}`,
+        copyPreview,
+        voiceScript: step.channel === 'voice' ? copyPreview : undefined,
+        triggerRules: [
+          'Runs before the due date',
+          'Stops instantly on payment verification',
+          'Audit entry written to ledger',
+        ],
+      };
+    }
+
+    const progress = sorted.length === 1 ? 0 : index / (sorted.length - 1);
+    const tone: SequenceDayStep['tone'] =
+      progress < 0.35 ? 'Friendly' : progress < 0.7 ? 'Firm' : progress < 0.9 ? 'Priority' : 'Urgent';
+
+    return {
+      id: step.id,
+      day: step.day,
+      stage: getStageForTone(tone),
+      channels: [step.channel],
+      tone,
+      headline: getChannelHeadline(step.channel, countsByChannel[step.channel]),
+      copyPreview: getDefaultCopyForTone(tone),
+      voiceScript: step.channel === 'voice' ? getDefaultVoiceScriptForTone(tone) : undefined,
+      triggerRules: getChannelRules(step.channel),
+    };
+  });
+}
 
 interface SequenceEngineBlockProps {
   planTier: PlanTier;
@@ -226,7 +707,6 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
   onUpgradePrompt,
   currentUser,
 }) => {
-  // Resolve logged-in user id & customer_uid
   const loggedInCustomerUid =
     currentUser?.customer_uid ||
     currentUser?.uid ||
@@ -259,674 +739,710 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
   const userSequenceKey = `recovr_custom_sequence_${loggedInUserId}`;
   const userDaysKey = `recovr_sequence_total_days_${loggedInUserId}`;
 
-  // Configurable sequence steps
-  const [sequence, setSequence] = useState<SequenceDayStep[]>(() => {
+  const [planRows, setPlanRows] = useState<PlanLimitRow[]>([]);
+  const caps = useMemo(
+    () => capabilitiesFromPlanRow(getPlanRow(planRows, planTier), planTier),
+    [planRows, planTier]
+  );
+  const capsSignature = JSON.stringify(caps);
+
+  const initialRef = useRef<{
+    type: SequenceType;
+    customSteps: SequenceTemplateStep[];
+    preDueWeeks: number;
+  } | null>(null);
+
+  if (!initialRef.current) {
+    let storedSequence: SequenceDayStep[] | null = null;
     try {
       const userStored = localStorage.getItem(userSequenceKey);
-      if (userStored) {
-        const parsed = JSON.parse(userStored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
       const stored = localStorage.getItem(STORAGE_KEY_CUSTOM_SEQUENCE);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      const parsed = userStored || stored ? JSON.parse(userStored || stored || '[]') : null;
+      if (Array.isArray(parsed) && parsed.length > 0) storedSequence = parsed as SequenceDayStep[];
+    } catch {}
+
+    const initialCaps = fallbackCapabilities(planTier);
+    const initialPreset = recommendedPreset(planTier, initialCaps);
+    let initialType: SequenceType = initialPreset.id;
+    let initialCustomSteps: SequenceTemplateStep[] = [];
+
+    if (storedSequence) {
+      const storedTemplate = stepsFromSequence(storedSequence);
+      const matched = PRESETS.find((preset) =>
+        sameSteps(filterStepsForCaps(preset.steps, initialCaps), storedTemplate)
+      );
+      if (matched && initialCaps.types[matched.id]) {
+        initialType = matched.id;
+      } else if (initialCaps.custom) {
+        initialType = 'custom';
+        initialCustomSteps = limitChannelCounts(
+          storedTemplate.filter((step) => initialCaps.channels[step.channel])
+        );
+      } else {
+        initialType = initialPreset.id;
       }
-    } catch (e) {
-      console.warn('Failed to parse sequence', e);
     }
-    return default21DaySequence;
-  });
 
-  // Configurable total days
-  const [totalDays, setTotalDays] = useState<number>(() => {
-    try {
-      const userStored = localStorage.getItem(userDaysKey);
-      if (userStored) return Math.max(1, Number(userStored) || 21);
-      const stored = localStorage.getItem(STORAGE_KEY_TOTAL_DAYS);
-      if (stored) return Math.max(1, Number(stored) || 21);
-    } catch (e) {}
-    return 21;
-  });
+    initialRef.current = {
+      type: initialType,
+      customSteps: initialCustomSteps,
+      preDueWeeks: storedSequence ? preDueWeeksFromSequence(storedSequence) : 0,
+    };
+  }
 
-  const [activeStepId, setActiveStepId] = useState<string>(() => {
-    return sequence[0]?.id || 'step-1';
-  });
+  const [selectedType, setSelectedType] = useState<SequenceType>(initialRef.current.type);
+  const [customSteps, setCustomSteps] = useState<SequenceTemplateStep[]>(initialRef.current.customSteps);
+  const [preDueWeeks, setPreDueWeeks] = useState<number>(initialRef.current.preDueWeeks);
 
-  // Save & Sync states
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
-  const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  // Editor Modal states
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
-  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchPlanLimits()
+      .then((rows) => {
+        if (!cancelled) setPlanRows(rows);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // Form states inside modal
-  const [formDay, setFormDay] = useState<number>(1);
-  const [formStage, setFormStage] = useState<string>('Friendly');
-  const [formTone, setFormTone] = useState<SequenceDayStep['tone']>('Friendly');
-  const [formChannels, setFormChannels] = useState<('email' | 'whatsapp' | 'voice')[]>(['email']);
-  const [formHeadline, setFormHeadline] = useState<string>('');
-  const [formCopy, setFormCopy] = useState<string>('');
-  const [formVoiceScript, setFormVoiceScript] = useState<string>('');
-  const [formRules, setFormRules] = useState<string[]>([]);
-  const [newRuleInput, setNewRuleInput] = useState<string>('');
+  const isTypeAllowed = (type: SequenceType): boolean => {
+    if (type === 'custom') return caps.custom;
+    return caps.types[type];
+  };
 
-  // Active selected step in the inspector
-  const activeStep = sequence.find((s) => s.id === activeStepId) || sequence[0] || default21DaySequence[0];
+  useEffect(() => {
+    let nextType = selectedType;
+    if (!isTypeAllowed(nextType)) nextType = recommendedPreset(planTier, caps).id;
 
-  // Persist helper
-  const persistSequence = (newSteps: SequenceDayStep[], days: number = totalDays) => {
-    const sorted = [...newSteps].sort((a, b) => a.day - b.day);
-    setSequence(sorted);
-    setTotalDays(days);
+    const nextCustomSteps = limitChannelCounts(
+      customSteps.filter((step) => caps.channels[step.channel])
+    );
+
+    if (nextType !== selectedType || nextCustomSteps.length !== customSteps.length) {
+      setSelectedType(nextType);
+      setCustomSteps(nextCustomSteps);
+    }
+    // capsSignature captures every capability change without retriggering on object identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capsSignature, planTier]);
+
+  const preDueTemplateSteps = useMemo(
+    () => buildPreDueTemplateSteps(preDueWeeks, caps, planTier),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [preDueWeeks, planTier, capsSignature]
+  );
+  const preDueTouchCount = preDueTemplateSteps.length;
+
+  const templateSteps = useMemo(() => {
+    const postDueSteps =
+      selectedType === 'custom'
+        ? customSteps
+        : PRESETS.find((item) => item.id === selectedType)?.steps || [];
+    return limitChannelCounts([...preDueTemplateSteps, ...filterStepsForCaps(postDueSteps, caps)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedType, customSteps, preDueTemplateSteps, capsSignature]);
+
+  const counts = useMemo(() => countSteps(templateSteps), [templateSteps]);
+  const sequence = useMemo(() => buildSequenceFromTemplateSteps(templateSteps), [templateSteps]);
+  const totalDays = useMemo(
+    () => clamp(maxStepDay(templateSteps), 1, caps.maxDays),
+    [templateSteps, caps.maxDays]
+  );
+
+  const applyPreset = (preset: SequencePreset) => {
+    if (!caps.types[preset.id]) {
+      onUpgradePrompt(preset.requiredTier);
+      return;
+    }
+
+    setSelectedType(preset.id);
+    setStatusMessage(null);
+  };
+
+  const applyCustom = () => {
+    if (!caps.custom) {
+      onUpgradePrompt('growth');
+      return;
+    }
+    setSelectedType('custom');
+    setStatusMessage(null);
+  };
+
+  const applyPreDueWeeks = (weeks: number) => {
+    setPreDueWeeks(clamp(weeks, 0, Math.max(...PRE_DUE_WEEK_OPTIONS)));
+    setStatusMessage(null);
+  };
+
+  const addCustomStep = () => {
+    if (!caps.custom) {
+      onUpgradePrompt('growth');
+      return;
+    }
+
+    const channel = CHANNEL_META.find(
+      (meta) => caps.channels[meta.id] && counts[meta.id] < MAX_TOUCHES_PER_CHANNEL
+    )?.id;
+    if (!channel) {
+      setStatusMessage('All available channels have reached the maximum 10 touches.');
+      return;
+    }
+
+    const day = clamp(customSteps.reduce((max, step) => Math.max(max, step.day), 0) + 1, 1, caps.maxDays);
+    setCustomSteps((prev) => [...prev, { id: `custom-${Date.now()}-${prev.length}`, day, channel }]);
+    setSelectedType('custom');
+    setStatusMessage(null);
+  };
+
+  const updateCustomStep = (id: string, patch: Partial<Pick<SequenceTemplateStep, 'day' | 'channel'>>) => {
+    if (patch.channel) {
+      const existing = customSteps.find((step) => step.id === id);
+      if (existing && existing.channel !== patch.channel && counts[patch.channel] >= MAX_TOUCHES_PER_CHANNEL) {
+        setStatusMessage(
+          `${CHANNEL_META.find((item) => item.id === patch.channel)?.label} already has the maximum 10 touches.`
+        );
+        return;
+      }
+    }
+
+    const nextDay =
+      patch.day === undefined ? undefined : clamp(Math.round(patch.day || 1), 1, caps.maxDays);
+
+    setCustomSteps((prev) =>
+      prev.map((step) =>
+        step.id === id
+          ? { ...step, ...patch, ...(nextDay === undefined ? {} : { day: nextDay }) }
+          : step
+      )
+    );
+    setStatusMessage(null);
+  };
+
+  const removeCustomStep = (id: string) => {
+    setCustomSteps((prev) => prev.filter((step) => step.id !== id));
+    setStatusMessage(null);
+  };
+
+  const persistSequence = (steps: SequenceDayStep[], days: number) => {
+    const sorted = [...steps].sort((a, b) => a.day - b.day);
     try {
       localStorage.setItem(STORAGE_KEY_CUSTOM_SEQUENCE, JSON.stringify(sorted));
       localStorage.setItem(STORAGE_KEY_TOTAL_DAYS, String(days));
       localStorage.setItem(userSequenceKey, JSON.stringify(sorted));
       localStorage.setItem(userDaysKey, String(days));
-    } catch (e) {
-      console.warn('Storage save notice', e);
+    } catch (error) {
+      console.warn('Sequence storage notice', error);
     }
   };
 
-  // Save custom sequence and dispatch to webhook with logged-in user id
-  const handleSaveAndSyncSequence = async () => {
-    setIsSaving(true);
-    setSyncStatusMessage(null);
-    setSaveSuccess(false);
+  const handleSave = async () => {
+    if (sequence.length === 0) {
+      setStatusMessage('Add at least one sequence step before saving.');
+      return;
+    }
 
-    // Save locally
+    setIsSaving(true);
+    setStatusMessage(null);
+    setSaveSuccess(false);
     persistSequence(sequence, totalDays);
 
     try {
-      await sendSequenceCustomizationWebhook({
-        userId: loggedInUserId,
-        customer_uid: loggedInCustomerUid || loggedInUserId,
-        customerUid: loggedInCustomerUid || loggedInUserId,
+      await saveSequenceToSupabase({
         userEmail: currentUser?.email || '',
-        userName: currentUser?.name || '',
-        userCompany: currentUser?.companyName || '',
-        planTier: planTier,
-        billingCycle: currentUser?.billingCycle || 'monthly',
-        totalDays: totalDays,
-        stepsCount: sequence.length,
-        sequence: sequence.map((s) => ({
-          id: s.id,
-          day: s.day,
-          stage: s.stage,
-          tone: s.tone,
-          channels: s.channels,
-          headline: s.headline,
-          triggerRules: s.triggerRules,
+        customer_uid: loggedInCustomerUid || loggedInUserId,
+        tier: planTier,
+        totalDays,
+        sequence: sequence.map((step) => ({
+          id: step.id,
+          day: step.day,
+          phase: step.phase,
+          stage: step.stage,
+          tone: step.tone,
+          channels: step.channels,
+          headline: step.headline,
+          triggerRules: step.triggerRules,
         })),
-        status: 'active_cadence_saved',
-        timestamp: new Date().toISOString(),
       });
-
       setSaveSuccess(true);
-      setSyncStatusMessage('Custom sequence saved and synced to automation webhook.');
-      setTimeout(() => {
-        setSaveSuccess(false);
-      }, 3500);
-      setTimeout(() => {
-        setSyncStatusMessage(null);
-      }, 6000);
-    } catch (err) {
-      console.warn('Webhook dispatch notification notice:', err);
+      setStatusMessage('Sequence saved. New invoices will use this saved cadence.');
+    } catch (error) {
+      console.warn('Sequence save fallback:', error);
       setSaveSuccess(true);
-      setSyncStatusMessage('Sequence saved locally.');
-      setTimeout(() => {
-        setSaveSuccess(false);
-      }, 3500);
-      setTimeout(() => {
-        setSyncStatusMessage(null);
-      }, 6000);
+      setStatusMessage('Sequence saved locally. Supabase sync is unavailable right now.');
     } finally {
       setIsSaving(false);
+      window.setTimeout(() => setSaveSuccess(false), 3500);
+      window.setTimeout(() => setStatusMessage(null), 6000);
     }
   };
 
-  // Open modal to create new step
-  const handleOpenCreateStep = () => {
-    setModalMode('create');
-    setEditingStepId(null);
-    const highestDay = sequence.reduce((max, s) => Math.max(max, s.day), 0);
-    const nextDay = Math.min(totalDays, highestDay > 0 ? highestDay + 1 : 1);
-    setFormDay(nextDay);
-    setFormStage(getStageForTone('Friendly'));
-    setFormTone('Friendly');
-    setFormChannels(['email']);
-    setFormHeadline(getHeadlineForTone('Friendly', nextDay));
-    setFormCopy(getDefaultCopyForTone('Friendly'));
-    setFormVoiceScript(getDefaultVoiceScriptForTone('Friendly'));
-    setFormRules(['Sent post-grace period', 'Stops on webhook verification']);
-    setNewRuleInput('');
-    setIsModalOpen(true);
-  };
-
-  // Open modal to edit existing step
-  const handleOpenEditStep = (step: SequenceDayStep) => {
-    setModalMode('edit');
-    setEditingStepId(step.id);
-    setFormDay(step.day);
-    setFormStage(step.stage);
-    setFormTone(step.tone);
-    setFormChannels(step.channels);
-    setFormHeadline(step.headline);
-    setFormCopy(step.copyPreview);
-    setFormVoiceScript(step.voiceScript || '');
-    setFormRules([...step.triggerRules]);
-    setNewRuleInput('');
-    setIsModalOpen(true);
-  };
-
-  // Handle tone change
-  const handleToneChange = (tone: SequenceDayStep['tone']) => {
-    setFormTone(tone);
-    setFormStage(getStageForTone(tone));
-    setFormHeadline(getHeadlineForTone(tone, formDay));
-    if (modalMode === 'create') {
-      setFormCopy(getDefaultCopyForTone(tone));
-      setFormVoiceScript(getDefaultVoiceScriptForTone(tone));
-    }
-  };
-
-  // Channel toggle inside modal
-  const handleToggleChannel = (ch: 'email' | 'whatsapp' | 'voice') => {
-    if (formChannels.includes(ch)) {
-      if (formChannels.length === 1) return; // Keep at least 1 channel
-      setFormChannels(formChannels.filter((c) => c !== ch));
-    } else {
-      setFormChannels([...formChannels, ch]);
-    }
-  };
-
-  // Add trigger rule
-  const handleAddRule = () => {
-    if (newRuleInput.trim() && !formRules.includes(newRuleInput.trim())) {
-      setFormRules([...formRules, newRuleInput.trim()]);
-      setNewRuleInput('');
-    }
-  };
-
-  // Remove trigger rule
-  const handleRemoveRule = (index: number) => {
-    setFormRules(formRules.filter((_, i) => i !== index));
-  };
-
-  // Save Step (create or edit)
-  const handleSaveStep = (e: React.FormEvent) => {
-    e.preventDefault();
-    const stage = formStage.trim() || getStageForTone(formTone);
-    const headline = formHeadline.trim() || getHeadlineForTone(formTone, formDay);
-
-    if (modalMode === 'create') {
-      const copy = formCopy.trim() || getDefaultCopyForTone(formTone);
-      const voice = formChannels.includes('voice') ? (formVoiceScript.trim() || getDefaultVoiceScriptForTone(formTone)) : undefined;
-      const newStep: SequenceDayStep = {
-        id: `step-${Date.now()}`,
-        day: Number(formDay),
-        stage: stage,
-        tone: formTone,
-        channels: formChannels,
-        headline: headline,
-        copyPreview: copy,
-        voiceScript: voice,
-        triggerRules: formRules.length > 0 ? formRules : ['Sent post-grace period'],
-      };
-      const updated = [...sequence, newStep];
-      persistSequence(updated);
-      setActiveStepId(newStep.id);
-    } else if (editingStepId) {
-      const updated = sequence.map((step) =>
-        step.id === editingStepId
-          ? {
-              ...step,
-              day: Number(formDay),
-              stage: stage,
-              tone: formTone,
-              channels: formChannels,
-              headline: headline,
-              copyPreview: step.copyPreview || getDefaultCopyForTone(formTone),
-              voiceScript: formChannels.includes('voice') ? (step.voiceScript || getDefaultVoiceScriptForTone(formTone)) : undefined,
-              triggerRules: formRules,
-            }
-          : step
-      );
-      persistSequence(updated);
-      setActiveStepId(editingStepId);
-    }
-    setIsModalOpen(false);
-  };
-
-  // Delete Step
-  const handleDeleteStep = (id: string) => {
-    if (sequence.length <= 1) {
-      alert('The sequence must contain at least one step.');
-      return;
-    }
-    const remaining = sequence.filter((s) => s.id !== id);
-    persistSequence(remaining);
-    setActiveStepId(remaining[0]?.id || '');
-    if (isModalOpen && editingStepId === id) {
-      setIsModalOpen(false);
-    }
-  };
-
-  // Reset to default
-  const handleResetDefaults = () => {
-    if (window.confirm('Reset sequence back to the default 21-Day cadence?')) {
-      persistSequence(default21DaySequence, 21);
-      setActiveStepId(default21DaySequence[0].id);
-    }
-  };
-
-  // Change total duration days
-  const handleDurationChange = (newDays: number) => {
-    const validDays = Math.max(1, Math.min(180, newDays));
-    setTotalDays(validDays);
-    persistSequence(sequence, validDays);
-  };
+  const selectedPreset = PRESETS.find((preset) => preset.id === selectedType);
 
   return (
     <div className="space-y-5">
-      {/* Top Header & Sequence Cadence Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="dashboard-card flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">
-              Sequence Engine Customizer
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-300">
+              <Sliders className="h-4 w-4" />
+            </span>
+            <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
+              Sequence Studio
             </h2>
           </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Customize cadence length, configure touchpoint days, and manage delivery channels.
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Choose a cadence, add reminders before the due date, build your own plan, and preview the exact
+            schedule before saving.
           </p>
         </div>
 
-        {/* Global Sequence Controls */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Duration Selector */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs">
-            <Clock className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Duration:</span>
-            <input
-              type="number"
-              min="1"
-              max="90"
-              value={totalDays}
-              onChange={(e) => handleDurationChange(Number(e.target.value))}
-              className="w-12 px-1.5 py-0.5 text-center font-mono font-bold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-zinc-900 dark:text-white focus:outline-none"
-            />
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Days</span>
-          </div>
-
-          {/* Quick Duration Presets */}
-          <div className="hidden sm:flex items-center gap-1">
-            {[14, 21, 30].map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => handleDurationChange(d)}
-                className={`px-2 py-1 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer ${
-                  totalDays === d
-                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold'
-                    : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800'
-                }`}
-                title={`Set to ${d} Days`}
-              >
-                {d}d
-              </button>
-            ))}
-          </div>
-
-          {/* Add Step Button */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+            {planTier} plan
+          </span>
           <button
-            onClick={handleOpenCreateStep}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 shadow-sm transition-all cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Step</span>
-          </button>
-
-          {/* Reset Defaults */}
-          <button
-            onClick={handleResetDefaults}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer"
-            title="Reset to Default 21-Day Sequence"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Reset Defaults</span>
-          </button>
-
-          {/* Save & Sync to Webhook Button */}
-          <button
-            onClick={handleSaveAndSyncSequence}
+            type="button"
+            onClick={handleSave}
             disabled={isSaving}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-all shadow-md cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-md transition-all cursor-pointer disabled:cursor-wait disabled:opacity-80 ${
               saveSuccess
-                ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 ring-2 ring-emerald-500/50'
-                : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30'
-            } ${isSaving ? 'opacity-80 cursor-wait' : ''}`}
-            title="Save custom sequence and dispatch to webhook with logged-in user id"
+                ? 'bg-emerald-600 shadow-emerald-600/30'
+                : 'bg-recovr-button shadow-recovr-button/30 hover:bg-recovr-button-hover'
+            }`}
           >
             {isSaving ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Saving & Syncing...</span>
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                Saving...
               </>
             ) : saveSuccess ? (
               <>
-                <Check className="w-3.5 h-3.5" />
-                <span>Saved & Synced!</span>
+                <Check className="h-3.5 w-3.5" />
+                Saved
               </>
             ) : (
               <>
-                <Save className="w-3.5 h-3.5" />
-                <span>Save Sequence</span>
+                <Save className="h-3.5 w-3.5" />
+                Save Sequence
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* Sync Status Banner */}
-      {syncStatusMessage && (
-        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-800 dark:text-emerald-300 animate-in fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="font-semibold">{syncStatusMessage}</span>
-          </div>
-          <div className="flex items-center gap-2.5 font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
-            <span>Tier: <strong className="uppercase">{planTier}</strong></span>
-            <span>•</span>
-            <span>Customer UID: <strong className="underline">{loggedInCustomerUid || loggedInUserId}</strong></span>
-          </div>
+      {statusMessage && (
+        <div className="dashboard-card flex items-center gap-2 px-4 py-3 text-xs text-emerald-700 dark:text-emerald-300">
+          <Check className="h-4 w-4 shrink-0" />
+          <span className="font-semibold">{statusMessage}</span>
         </div>
       )}
 
-      {/* Sequence Timeline & Stepper Card */}
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0B10] p-5 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider font-mono">
-              Sequence Steps
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="space-y-5">
+          <div>
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-white">
+                  1. Choose sequence type
+                </h3>
+                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Channels unavailable in your plan are removed automatically.
+                </p>
+              </div>
+              <span className="hidden text-[10px] font-mono text-zinc-400 sm:block">
+                Max 10 touches / channel / invoice
+              </span>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {PRESETS.map((preset) => {
+                const allowed = caps.types[preset.id];
+                const active = selectedType === preset.id;
+                const presetCounts = countSteps(filterStepsForCaps(preset.steps, caps));
+                const availableChannels = CHANNEL_META.filter(
+                  (meta) => caps.channels[meta.id] && preset.steps.some((step) => step.channel === meta.id)
+                ).map((meta) => meta.shortLabel);
+                const Icon = preset.icon;
+
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    data-accent={preset.accent}
+                    className={`dashboard-card relative flex flex-col gap-2 p-4 text-left transition-all ${
+                      active ? 'is-selected' : ''
+                    } ${allowed ? 'cursor-pointer' : 'cursor-pointer opacity-65'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-300">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      {active ? (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-recovr-button text-white">
+                          <Check className="h-3 w-3" />
+                        </span>
+                      ) : !allowed ? (
+                        <Lock className="h-4 w-4 text-zinc-400" />
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-bold text-zinc-900 dark:text-white">{preset.label}</div>
+                      <p className="mt-1 min-h-[46px] text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                        {preset.description}
+                      </p>
+                      {allowed && availableChannels.length > 0 && (
+                        <div className="mt-1 text-[10px] font-semibold text-zinc-400">
+                          Channels: {availableChannels.join(' · ')}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                      <span className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 dark:border-zinc-700 dark:bg-zinc-800/60">
+                        30d
+                      </span>
+                      <span>
+                        Total: {presetCounts.email} Emails · {presetCounts.whatsapp} WhatsApp ·{' '}
+                        {presetCounts.voice} Calls = {totalCount(presetCounts)} touchpoints
+                      </span>
+                    </div>
+
+                    {!allowed && (
+                      <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                        {preset.requiredTier} plan and above
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={applyCustom}
+                data-accent="emerald"
+                className={`dashboard-card relative flex flex-col gap-2 p-4 text-left transition-all ${
+                  selectedType === 'custom' ? 'is-selected' : ''
+                } ${caps.custom ? 'cursor-pointer' : 'cursor-pointer opacity-65'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                    <Sliders className="h-4 w-4" />
+                  </span>
+                  {selectedType === 'custom' ? (
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
+                      <Check className="h-3 w-3" />
+                    </span>
+                  ) : !caps.custom ? (
+                    <Lock className="h-4 w-4 text-zinc-400" />
+                  ) : null}
+                </div>
+
+                <div>
+                  <div className="text-sm font-bold text-zinc-900 dark:text-white">Custom Sequence</div>
+                  <p className="mt-1 min-h-[46px] text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                    Build your own day-by-day cadence with the channels your plan allows.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                  <span className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 dark:border-zinc-700 dark:bg-zinc-800/60">
+                    Your days
+                  </span>
+                  <span>{totalCount(counts)} touches</span>
+                </div>
+
+                {!caps.custom && (
+                  <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    growth plan and above
+                  </div>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="dashboard-card p-5">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-white">
+                  2. Pre-due date reachouts
+                </h3>
+                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Choose how early reminders start before the due date. Free drafts 3 emails per week,
+                  Basic 2 emails + 1 WhatsApp, Growth and Enterprise email + WhatsApp + call. The mix
+                  repeats for 2 or 3 weeks prior.
+                </p>
+              </div>
+              <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                {preDueWeeks === 0 ? 'None' : `${preDueTouchCount} pre-due touch${preDueTouchCount === 1 ? '' : 'es'}`}
+              </span>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {PRE_DUE_WEEK_OPTIONS.map((weeks) => {
+                const active = preDueWeeks === weeks;
+                return (
+                  <button
+                    key={weeks}
+                    type="button"
+                    onClick={() => applyPreDueWeeks(weeks)}
+                    className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                      active
+                        ? 'border-recovr-button bg-recovr-button/10 text-recovr-button dark:text-purple-300'
+                        : 'border-zinc-200 bg-white/70 text-zinc-700 hover:border-purple-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-200 dark:hover:border-purple-400/40'
+                    }`}
+                  >
+                    <span>
+                      <span className="block text-xs font-bold">
+                        {weeks === 0 ? 'None' : `${weeks} ${weeks === 1 ? 'week' : 'weeks'} prior`}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-zinc-500 dark:text-zinc-400">
+                        {weeks === 0
+                          ? 'Starts after the due date'
+                          : `${weeks * 7}-day pre-due window`}
+                      </span>
+                    </span>
+                    {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {preDueWeeks > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                <span>Drafted:</span>
+                {preDueTemplateSteps.map((step) => {
+                  const channelLabel = CHANNEL_META.find((meta) => meta.id === step.channel)?.shortLabel;
+                  return (
+                    <span
+                      key={step.id}
+                      className="rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-purple-700 dark:text-purple-300"
+                    >
+                      {formatStepTiming(step.day)} · {channelLabel}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="dashboard-card p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-white">
+                  3. Generated cadence
+                </h3>
+                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  {selectedPreset
+                    ? `${selectedPreset.label} · ${totalDays}-day span`
+                    : `Custom sequence · ${totalDays}-day span`}
+                  {preDueWeeks > 0 ? ` · ${preDueTouchCount} pre-due touch${preDueTouchCount === 1 ? '' : 'es'}` : ''}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-zinc-500 dark:text-zinc-400">
+                <span>Email {counts.email}/10</span>
+                <span>·</span>
+                <span>WhatsApp {counts.whatsapp}/10</span>
+                <span>·</span>
+                <span>Call {counts.voice}/10</span>
+              </div>
+            </div>
+
+            {selectedType === 'custom' && (
+              <div className="mb-4 rounded-2xl border border-purple-500/20 bg-purple-500/[0.04] p-4 dark:border-purple-400/20">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-zinc-900 dark:text-white">Build your own sequence</h4>
+                    <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                      Start with one card, choose its day and channel, then add the next one. No fixed
+                      minimum — you decide how many touches to add, up to 10 per channel. Scroll over a
+                      day or channel to change it.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addCustomStep}
+                    className="flex items-center gap-1.5 rounded-xl bg-recovr-button px-3 py-2 text-[11px] font-bold text-white transition-colors hover:bg-recovr-button-hover cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {customSteps.length === 0 ? 'Start with your sequence' : 'Add next step'}
+                  </button>
+                </div>
+
+                {customSteps.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {customSteps.map((step, index) => (
+                      <div
+                        key={step.id}
+                        className="grid grid-cols-[auto_120px_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-purple-500/20 bg-white/80 p-2 dark:border-purple-400/15 dark:bg-zinc-900/60"
+                      >
+                        <span className="px-1 font-mono text-[10px] font-bold text-zinc-400">#{index + 1}</span>
+                        <NumberStepper
+                          value={step.day}
+                          min={1}
+                          max={caps.maxDays}
+                          onChange={(day) => updateCustomStep(step.id, { day })}
+                          label={`Day for step ${index + 1}`}
+                          compact
+                        />
+                        <ChannelSelect
+                          value={step.channel}
+                          options={CHANNEL_META.filter((meta) => caps.channels[meta.id]).map((meta) => meta.id)}
+                          counts={counts}
+                          onChange={(channel) => updateCustomStep(step.id, { channel })}
+                          label={`Channel for step ${index + 1}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeCustomStep(step.id)}
+                          aria-label={`Remove step ${index + 1}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-rose-500/10 hover:text-rose-500 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-xl border border-dashed border-purple-300 py-6 text-center dark:border-purple-500/30">
+                    <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                      No custom steps yet
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                      Click “Start with your sequence” to create the first card.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {sequence.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-zinc-300 py-10 text-center dark:border-zinc-700">
+                <Sliders className="h-7 w-7 text-zinc-400" />
+                <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                  Add at least one sequence step
+                </p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Choose a preset above or build your own custom cadence.
+                </p>
+              </div>
+            ) : (
+              <div className="grid max-h-[460px] gap-2 overflow-y-auto pr-1 md:grid-cols-2">
+                {sequence.map((step, index) => {
+                  const channel = step.channels[0];
+                  const meta = CHANNEL_META.find((item) => item.id === channel)!;
+                  const Icon = meta.icon;
+
+                  return (
+                    <div
+                      key={`${step.id}-${index}`}
+                      className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white/70 p-3 dark:border-zinc-800 dark:bg-zinc-900/50"
+                    >
+                      <span className="shrink-0 rounded-lg bg-zinc-100 px-2 py-1 font-mono text-[10px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                        <span title={step.copyPreview}>{formatStepTiming(step.day)}</span>
+                      </span>
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-300">
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs font-semibold text-zinc-800 dark:text-zinc-100">
+                          {meta.shortLabel}
+                        </div>
+                        <div className="mt-0.5 truncate text-[10px] text-zinc-500 dark:text-zinc-400">
+                          {step.phase === 'before_due' ? step.headline : `${step.stage} · ${step.tone}`}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-4 border-t border-zinc-200 pt-3 text-[11px] font-semibold text-zinc-700 dark:border-zinc-800 dark:text-zinc-200">
+              Total: {counts.email} Emails · {counts.whatsapp} WhatsApp · {counts.voice} Calls ={' '}
+              {totalCount(counts)} touchpoints
+            </div>
+          </div>
+        </div>
+
+        <div className="dashboard-card p-4 xl:sticky xl:top-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-white">
+              4. Finalized sequence
+            </h3>
+            <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-purple-700 dark:text-purple-300">
+              {sequence.length} steps
             </span>
           </div>
 
-          <div className="text-xs text-zinc-400 font-mono">
-            Cadence span: Day 1 → Day {totalDays}
-          </div>
-        </div>
+          {sequence.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-zinc-300 py-8 text-center dark:border-zinc-700">
+              <Sliders className="h-6 w-6 text-zinc-400" />
+              <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                Nothing to flow yet
+              </p>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                Choose a cadence or add a custom step.
+              </p>
+            </div>
+          ) : (
+            <div className="relative max-h-[620px] overflow-y-auto pr-1">
+              <div className="pointer-events-none absolute bottom-4 left-[13px] top-4 w-px bg-gradient-to-b from-purple-400 via-zinc-300 to-rose-400 dark:from-purple-300 dark:via-zinc-700 dark:to-rose-500" />
+              <div className="space-y-2">
+                {sequence.map((step, index) => {
+                  const channel = step.channels[0];
+                  const meta = CHANNEL_META.find((item) => item.id === channel)!;
+                  const Icon = meta.icon;
+                  const beforeDue = step.day < 0;
+                  const showDueMarker = !beforeDue && sequence[index - 1]?.day < 0;
 
-        {/* Stepper Buttons Carousel / Row */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-          {sequence.map((step) => {
-            const isCurrent = step.id === activeStep.id;
-            const isFinal = step.day >= totalDays;
+                  return (
+                    <React.Fragment key={`${step.id}-${index}`}>
+                      {showDueMarker && (
+                        <div className="relative flex items-center gap-2 py-1">
+                          <span className="z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-amber-400 bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-300">
+                            Due date
+                          </span>
+                        </div>
+                      )}
 
-            return (
-              <button
-                key={step.id}
-                onClick={() => {
-                  setActiveStepId(step.id);
-                  handleOpenEditStep(step);
-                }}
-                className={`flex-shrink-0 min-w-[105px] p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                  isCurrent
-                    ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-100 shadow-sm ring-1 ring-indigo-500/30'
-                    : isFinal
-                    ? 'border-rose-500/30 bg-rose-50/50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-200 hover:border-rose-400'
-                    : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 hover:border-indigo-400 dark:hover:border-indigo-500/60'
-                }`}
-                title={`Click to edit Day ${step.day} touchpoint`}
-              >
-                <div className="flex items-center justify-between text-[10px] font-mono font-bold mb-1">
-                  <span className={isCurrent ? 'text-indigo-600 dark:text-indigo-300' : 'text-zinc-500 dark:text-zinc-400'}>
-                    DAY {step.day}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {step.channels.includes('email') && <Mail className="w-2.5 h-2.5 opacity-80" />}
-                    {step.channels.includes('whatsapp') && <MessageSquare className="w-2.5 h-2.5 opacity-80" />}
-                    {step.channels.includes('voice') && <PhoneCall className="w-2.5 h-2.5 opacity-80" />}
-                  </div>
-                </div>
-
-                <div className="text-xs font-semibold truncate leading-snug">
-                  {step.tone}
-                </div>
-              </button>
-            );
-          })}
-
-          {/* Quick + Add Step button inside the stepper */}
-          <button
-            type="button"
-            onClick={handleOpenCreateStep}
-            className="flex-shrink-0 w-24 p-2.5 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800 hover:border-indigo-500 dark:hover:border-indigo-400 bg-transparent flex flex-col items-center justify-center text-zinc-400 hover:text-indigo-500 transition-colors cursor-pointer"
-            title="Add New Step"
-          >
-            <Plus className="w-4 h-4 mb-1" />
-            <span className="text-[11px] font-medium">+ Step</span>
-          </button>
-        </div>
-
-        {/* Selected Step Detail & Inspector Panel */}
-        {activeStep && (
-          <div 
-            onClick={() => handleOpenEditStep(activeStep)}
-            className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-[#0E0F16] hover:border-indigo-400 dark:hover:border-indigo-500/50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs cursor-pointer transition-all group"
-            title="Click to edit step details"
-          >
-            {/* Step info */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                DAY {activeStep.day}
-              </span>
-              <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                Tone: <span className="font-mono text-indigo-600 dark:text-indigo-400">{activeStep.tone}</span>
-              </span>
-              <span className="text-xs text-zinc-300 dark:text-zinc-700">•</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-zinc-500 font-medium">Channels:</span>
-                {activeStep.channels.map((ch) => (
-                  <span
-                    key={ch}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 uppercase"
-                  >
-                    {ch === 'email' && <Mail className="w-2.5 h-2.5 text-indigo-500" />}
-                    {ch === 'whatsapp' && <MessageSquare className="w-2.5 h-2.5 text-emerald-500" />}
-                    {ch === 'voice' && <PhoneCall className="w-2.5 h-2.5 text-purple-500" />}
-                    <span>{ch}</span>
-                  </span>
-                ))}
+                      <div className="relative flex items-center gap-2 rounded-lg border border-zinc-200 bg-white/70 px-1.5 py-1.5 dark:border-zinc-800 dark:bg-zinc-900/50">
+                        <span
+                          className={`z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 bg-white dark:bg-zinc-900 ${
+                            beforeDue
+                              ? 'border-purple-400 text-purple-600 dark:text-purple-300'
+                              : 'border-zinc-300 text-zinc-600 dark:border-zinc-600 dark:text-zinc-300'
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-mono text-[10px] font-bold text-zinc-700 dark:text-zinc-200">
+                          {formatStepTiming(step.day)}
+                        </span>
+                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                          {meta.shortLabel}
+                        </span>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
               </div>
-              <span className="text-[11px] text-zinc-400 dark:text-zinc-500 italic hidden sm:inline ml-1 group-hover:text-indigo-500 transition-colors">
-                (Click to customize)
-              </span>
             </div>
+          )}
 
-            {/* Action Buttons for Step */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteStep(activeStep.id);
-                }}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                title="Delete Step"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+          <div className="mt-3 border-t border-zinc-200 pt-2 font-mono text-[10px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+            {counts.email}E · {counts.whatsapp}WA · {counts.voice}Call = {totalCount(counts)} total
           </div>
-        )}
+        </div>
       </div>
-
-      {/* ========================================================================= */}
-      {/* STEP EDITOR MODAL (Full customization for Days, Sequence, & Messages)    */}
-      {/* ========================================================================= */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div 
-            className="relative w-full max-w-2xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#101118] shadow-2xl overflow-hidden p-6 text-zinc-900 dark:text-zinc-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-200 dark:border-zinc-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-500 dark:text-indigo-400">
-                  <Sliders className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-zinc-900 dark:text-white">
-                    {modalMode === 'create' ? 'Add Sequence Step' : `Edit Step — Day ${formDay}`}
-                  </h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Configure schedule timing, tone, and delivery channels.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleSaveStep} className="space-y-4">
-              {/* Row 1: Day Number & Tone */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Day Number */}
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Day in Sequence <span className="text-indigo-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="90"
-                    required
-                    value={formDay}
-                    onChange={(e) => {
-                      const d = Number(e.target.value);
-                      setFormDay(d);
-                      if (modalMode === 'create') {
-                        setFormHeadline(getHeadlineForTone(formTone, d));
-                      }
-                    }}
-                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                {/* Tone */}
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Tone / Urgency
-                  </label>
-                  <select
-                    value={formTone}
-                    onChange={(e) => handleToneChange(e.target.value as SequenceDayStep['tone'])}
-                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="Friendly">Friendly</option>
-                    <option value="Firm">Firm</option>
-                    <option value="Priority">Priority</option>
-                    <option value="Urgent">Urgent</option>
-                    <option value="Human Review">Human Review</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 2: Channel Multi-Select */}
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Channels Activated for this Step
-                </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleChannel('email')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                      formChannels.includes('email')
-                        ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-xs'
-                        : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500'
-                    }`}
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>Email</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleToggleChannel('whatsapp')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                      formChannels.includes('whatsapp')
-                        ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-xs'
-                        : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500'
-                    }`}
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>WhatsApp</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleToggleChannel('voice')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                      formChannels.includes('voice')
-                        ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-500 text-purple-700 dark:text-purple-300 shadow-xs'
-                        : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500'
-                    }`}
-                  >
-                    <PhoneCall className="w-3.5 h-3.5" />
-                    <span>Voice AI</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Footer Actions */}
-              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                {modalMode === 'edit' && editingStepId ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteStep(editingStepId)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Delete Step</span>
-                  </button>
-                ) : (
-                  <div />
-                )}
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md transition-all cursor-pointer"
-                  >
-                    {modalMode === 'create' ? 'Add Step to Sequence' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

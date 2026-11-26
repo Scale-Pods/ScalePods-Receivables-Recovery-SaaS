@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bot, MessageCircle, UserRound, X } from "lucide-react";
+import { Bot, Image as ImageIcon, MessageCircle, UserRound, X } from "lucide-react";
 
 import { AIChatCard } from "@/components/ui/ai-chat-card";
 import {
@@ -69,7 +69,9 @@ function driveFileId(url: string): string | null {
 }
 
 function driveImageUrl(fileId: string): string {
-  return `https://drive.google.com/uc?export=view&id=${encodeURIComponent(fileId)}`;
+  // Load through our same-origin relay: Drive blocks direct cross-site image
+  // embedding with CORP, which otherwise leaves the alt text in the bubble.
+  return `/api/chat-image?id=${encodeURIComponent(fileId)}`;
 }
 
 function shortUrl(url: string): string {
@@ -81,8 +83,61 @@ function shortUrl(url: string): string {
   }
 }
 
+function ChatImage({
+  src,
+  href,
+  label,
+  onLoad: handleLoad,
+}: {
+  src: string;
+  href: string;
+  label: string;
+  onLoad?: () => void;
+}) {
+  const [failed, setFailed] = React.useState(false);
+
+  if (failed) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={label}
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-neutral-50 px-3 py-4 text-xs font-medium text-violet-600 hover:bg-violet-50 dark:bg-neutral-800/50 dark:text-violet-400 dark:hover:bg-violet-950/30"
+      >
+        <ImageIcon className="h-4 w-4 shrink-0" />
+        <span>Open reference image in Drive</span>
+      </a>
+    );
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-2 block overflow-hidden rounded-xl border border-black/10 dark:border-white/10"
+      title="Open reference image in a new tab"
+    >
+      <img
+        src={src}
+        alt="Reference image"
+        loading="eager"
+        decoding="async"
+        onLoad={handleLoad}
+        onError={() => setFailed(true)}
+        className="h-32 w-full rounded-lg bg-neutral-100 object-contain dark:bg-neutral-800"
+      />
+    </a>
+  );
+}
+
 /** Render plain links as clickable anchors and image links inline for reference. */
-function renderMessageContent(content: string, isUser: boolean): React.ReactNode[] {
+function renderMessageContent(
+  content: string,
+  isUser: boolean,
+  onImageLoad?: () => void,
+): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
 
@@ -105,28 +160,13 @@ function renderMessageContent(content: string, isUser: boolean): React.ReactNode
     if (isImageUrl(url) || fileId) {
       const imageSrc = fileId ? driveImageUrl(fileId) : url;
       nodes.push(
-        <a
+        <ChatImage
           key={`image-${start}`}
+          src={imageSrc}
           href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 block overflow-hidden rounded-xl border border-black/10 dark:border-white/10"
-          title="Open image in a new tab"
-        >
-          <img
-            src={imageSrc}
-            alt={text}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onError={(event) => {
-              if (fileId && !event.currentTarget.dataset.fallback) {
-                event.currentTarget.dataset.fallback = "1";
-                event.currentTarget.src = `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=view&authuser=0`;
-              }
-            }}
-            className="max-h-44 w-full object-cover"
-          />
-        </a>,
+          label={text}
+          onLoad={onImageLoad}
+        />,
       );
     } else {
       nodes.push(
@@ -179,6 +219,11 @@ export function AIChatWidget({ uid }: { uid?: string }) {
     }
   }, []);
 
+  const scrollToBottom = React.useCallback(() => {
+    const node = transcriptRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, []);
+
   React.useEffect(() => clearRequest, [clearRequest]);
 
   // Switch to that user's saved conversation when the signed-in account changes.
@@ -204,9 +249,8 @@ export function AIChatWidget({ uid }: { uid?: string }) {
 
   // Keep the newest message in view whenever the transcript changes.
   React.useEffect(() => {
-    const node = transcriptRef.current;
-    if (node) node.scrollTop = node.scrollHeight;
-  }, [open, messages, isSending, error, composerKey]);
+    scrollToBottom();
+  }, [open, messages, isSending, error, composerKey, scrollToBottom]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -381,7 +425,7 @@ export function AIChatWidget({ uid }: { uid?: string }) {
                             : "rounded-2xl rounded-bl-sm border border-border bg-white text-foreground dark:bg-neutral-900",
                         )}
                       >
-                        {renderMessageContent(item.content, item.role === "user")}
+                        {renderMessageContent(item.content, item.role === "user", scrollToBottom)}
                       </div>
                       {item.role === "user" ? (
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">

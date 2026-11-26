@@ -90,6 +90,33 @@ const PLACEHOLDER_REPLIES = new Set([
   'received',
 ]);
 
+const URL_SCAN = /https?:\/\/[^\s"<>\\]+/gi;
+
+/** Find every URL in any field of a webhook response, including nested ones. */
+function collectUrls(value: unknown): string[] {
+  const found: string[] = [];
+
+  const visit = (node: unknown): void => {
+    if (typeof node === 'string') {
+      for (const match of node.matchAll(URL_SCAN)) {
+        const url = match[0].replace(/[.,;:!?)\]]+$/, '');
+        if (url && !found.includes(url)) found.push(url);
+      }
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (node && typeof node === 'object') {
+      Object.values(node).forEach(visit);
+    }
+  };
+
+  visit(value);
+  return found;
+}
+
 /** Normalize the many response shapes an n8n webhook can return into one string. */
 export function extractChatReply(raw: unknown): string {
   if (raw === null || raw === undefined) return '';
@@ -141,7 +168,17 @@ export function extractChatReply(raw: unknown): string {
       if (reply && !parts.includes(reply)) parts.push(reply);
     }
 
-    return parts.join('\n');
+    const reply = parts.join('\n');
+    // The workflow sometimes says it "can't send" the image while hiding a
+    // Drive/file URL in another field. Surface those URLs so the chat can
+    // render the reference image.
+    const extraUrls = collectUrls(raw)
+      .filter((url) => !reply.includes(url))
+      .slice(0, 5);
+
+    return extraUrls.length
+      ? `${reply}${reply ? '\n' : ''}${extraUrls.join('\n')}`
+      : reply;
   }
 
   return '';

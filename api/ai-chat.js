@@ -31,6 +31,33 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+const URL_SCAN = /https?:\/\/[^\s"<>\\]+/gi;
+
+/** Find every URL in any field of a webhook response, including nested ones. */
+function collectUrls(value) {
+  const found = [];
+
+  const visit = (node) => {
+    if (typeof node === 'string') {
+      for (const match of node.matchAll(URL_SCAN)) {
+        const url = match[0].replace(/[.,;:!?)\]]+$/, '');
+        if (url && !found.includes(url)) found.push(url);
+      }
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (node && typeof node === 'object') {
+      Object.values(node).forEach(visit);
+    }
+  };
+
+  visit(value);
+  return found;
+}
+
 /**
  * n8n "Respond to Webhook" may return plain text, a JSON object, an array of
  * objects, or nested fields such as `{ output: { text: "..." } }`. Normalize all
@@ -85,7 +112,16 @@ export function extractChatReply(raw) {
       if (reply && !parts.includes(reply)) parts.push(reply);
     }
 
-    return parts.join('\n');
+    const reply = parts.join('\n');
+    // Surface Drive/file links even when the workflow's text says it can't
+    // send the image directly.
+    const extraUrls = collectUrls(raw)
+      .filter((url) => !reply.includes(url))
+      .slice(0, 5);
+
+    return extraUrls.length
+      ? `${reply}${reply ? '\n' : ''}${extraUrls.join('\n')}`
+      : reply;
   }
 
   return '';

@@ -4,6 +4,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import { createInvoiceWorkflowHandler } from './server/invoiceWorkflow.js'
 import planLimitsHandler from './api/plan-limits.js'
 import aiChatHandler from './api/ai-chat.js'
+import chatImageHandler from './api/chat-image.js'
 
 function googleTokenExchangePlugin(env: Record<string, string>): Plugin {
   return {
@@ -144,6 +145,22 @@ function aiChatPlugin(env: Record<string, string>): Plugin {
   }
 }
 
+function chatImagePlugin(): Plugin {
+  return {
+    name: 'chat-image-dev-middleware',
+    configureServer(server) {
+      server.middlewares.use('/api/chat-image', async (req, res) => {
+        await chatImageHandler(req, res)
+      })
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use('/api/chat-image', async (req, res) => {
+        await chatImageHandler(req, res)
+      })
+    },
+  }
+}
+
 function invoiceWorkflowPlugin(env: Record<string, string>): Plugin {
   const routes: Record<string, ReturnType<typeof createInvoiceWorkflowHandler>> = {
     '/api/invoice-extract': createInvoiceWorkflowHandler('extract'),
@@ -167,7 +184,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [react(), googleTokenExchangePlugin(env), planLimitsPlugin(env), aiChatPlugin(env), invoiceWorkflowPlugin(env)],
+    plugins: [react(), googleTokenExchangePlugin(env), planLimitsPlugin(env), aiChatPlugin(env), chatImagePlugin(), invoiceWorkflowPlugin(env)],
     resolve: {
       alias: [
         // Keep generated/copied UI primitives at the requested root-level /components/ui path.

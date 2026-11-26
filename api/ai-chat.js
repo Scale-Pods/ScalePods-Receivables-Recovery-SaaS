@@ -68,14 +68,24 @@ export function extractChatReply(raw) {
       'message',
       'content',
       'result',
+      'image',
+      'image_url',
+      'imageUrl',
+      'images',
+      'attachments',
+      'url',
+      'link',
       'data',
     ];
 
+    const parts = [];
     for (const key of preferredKeys) {
       if (!(key in raw)) continue;
       const reply = extractChatReply(raw[key]);
-      if (reply) return reply;
+      if (reply && !parts.includes(reply)) parts.push(reply);
     }
+
+    return parts.join('\n');
   }
 
   return '';

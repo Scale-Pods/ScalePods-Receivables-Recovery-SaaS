@@ -39,6 +39,119 @@ function toTranscript(uid: string): TranscriptMessage[] {
   }));
 }
 
+const URL_PATTERN = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"']+)/gi;
+
+function isImageUrl(url: string): boolean {
+  try {
+    return /\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+/** Google Drive share links don't end in an image extension, so extract the file id. */
+function driveFileId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host !== 'drive.google.com' &&
+      host !== 'drive.usercontent.google.com' &&
+      !host.endsWith('.drive.google.com')
+    ) {
+      return null;
+    }
+    const fromPath = parsed.pathname.match(/\/file\/d\/([^/]+)/)?.[1];
+    return fromPath || parsed.searchParams.get('id') || null;
+  } catch {
+    return null;
+  }
+}
+
+function driveImageUrl(fileId: string): string {
+  return `https://drive.google.com/uc?export=view&id=${encodeURIComponent(fileId)}`;
+}
+
+function shortUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
+/** Render plain links as clickable anchors and image links inline for reference. */
+function renderMessageContent(content: string, isUser: boolean): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+
+  for (const match of content.matchAll(URL_PATTERN)) {
+    const start = match.index ?? 0;
+    if (start > lastIndex) nodes.push(content.slice(lastIndex, start));
+
+    const label = match[1];
+    const rawUrl = match[2] ?? match[3] ?? '';
+    const url = rawUrl.replace(/[.,;:!?)\]]+$/, '');
+
+    if (!/^https?:\/\//i.test(url)) {
+      nodes.push(match[0]);
+      lastIndex = start + match[0].length;
+      continue;
+    }
+
+    const text = label || shortUrl(url);
+    const fileId = driveFileId(url);
+    if (isImageUrl(url) || fileId) {
+      const imageSrc = fileId ? driveImageUrl(fileId) : url;
+      nodes.push(
+        <a
+          key={`image-${start}`}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 block overflow-hidden rounded-xl border border-black/10 dark:border-white/10"
+          title="Open image in a new tab"
+        >
+          <img
+            src={imageSrc}
+            alt={text}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={(event) => {
+              if (fileId && !event.currentTarget.dataset.fallback) {
+                event.currentTarget.dataset.fallback = "1";
+                event.currentTarget.src = `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=view&authuser=0`;
+              }
+            }}
+            className="max-h-44 w-full object-cover"
+          />
+        </a>,
+      );
+    } else {
+      nodes.push(
+        <a
+          key={`link-${start}`}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "underline underline-offset-2",
+            isUser ? "text-white/90" : "text-violet-600 dark:text-violet-400",
+          )}
+        >
+          {text}
+        </a>,
+      );
+    }
+
+    lastIndex = start + match[0].length;
+  }
+
+  if (lastIndex < content.length) nodes.push(content.slice(lastIndex));
+  return nodes;
+}
+
 /** Floating assistant: AIChatCard UI + n8n-backed conversation, pinned bottom-right. */
 export function AIChatWidget({ uid }: { uid?: string }) {
   const resolvedUid = uid ?? getCurrentUserUid();
@@ -268,7 +381,7 @@ export function AIChatWidget({ uid }: { uid?: string }) {
                             : "rounded-2xl rounded-bl-sm border border-border bg-white text-foreground dark:bg-neutral-900",
                         )}
                       >
-                        {item.content}
+                        {renderMessageContent(item.content, item.role === "user")}
                       </div>
                       {item.role === "user" ? (
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">

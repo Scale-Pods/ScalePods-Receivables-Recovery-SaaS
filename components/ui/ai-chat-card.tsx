@@ -63,7 +63,7 @@ export function AIChatCard({
   const [userMessage, setUserMessage] = React.useState("");
   const [spins, setSpins] = React.useState(0);
 
-  const { text: typedMessage, phase } = useTypewriter(prompts, {
+  const { text: typedMessage } = useTypewriter(prompts, {
     typeMs: 48,
     deleteMs: 14,
     holdMs: 3400,
@@ -166,36 +166,49 @@ export function AIChatCard({
       {/* Composer */}
       <div className="px-5 pb-5">
         <div className="rounded-[18px] bg-neutral-200/50 p-3 transition-colors focus-within:bg-neutral-200/70 dark:bg-neutral-800/50 dark:focus-within:bg-neutral-800/70">
-          {userActive || !autoType ? (
-            <textarea
-              ref={textareaRef}
-              value={userMessage}
-              onChange={(event) => setUserMessage(event.target.value)}
-              placeholder={placeholder}
-              rows={2}
-              className="w-full resize-none bg-transparent text-sm leading-5 text-foreground outline-hidden placeholder:text-muted-foreground"
-            />
-          ) : (
-            <div
-              onClick={takeOver}
-              className="h-10 w-full cursor-text overflow-hidden text-left text-sm leading-5 text-muted-foreground"
-            >
-              {message}
-              <motion.span
-                aria-hidden
-                className="ml-px inline-block h-3.5 w-px bg-muted-foreground align-middle"
-                animate={{ opacity: [1, 1, 0, 0] }}
-                transition={{
-                  duration: 1,
-                  repeat: Infinity,
-                  times: [0, 0.5, 0.5, 1],
+          {/* Fixed-height, out-of-flow composer: the typing animation can never
+              resize the card or push the transcript around. */}
+          <div className="relative h-10 w-full">
+            {userActive || !autoType ? (
+              <textarea
+                ref={textareaRef}
+                value={userMessage}
+                onChange={(event) => setUserMessage(event.target.value)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === "Enter" &&
+                    !event.shiftKey &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    event.preventDefault();
+                    onSend?.(message);
+                  }
                 }}
+                placeholder={placeholder}
+                className="absolute inset-0 h-full w-full resize-none bg-transparent text-sm leading-5 text-foreground outline-hidden placeholder:text-muted-foreground"
               />
-              {!message ? (
-                <span className="text-muted-foreground">{placeholder}</span>
-              ) : null}
-            </div>
-          )}
+            ) : (
+              <div
+                onClick={takeOver}
+                className="absolute inset-0 cursor-text overflow-hidden text-left text-sm leading-5 text-muted-foreground"
+              >
+                {message}
+                <motion.span
+                  aria-hidden
+                  className="ml-px inline-block h-3.5 w-px bg-muted-foreground align-middle"
+                  animate={{ opacity: [1, 1, 0, 0] }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    times: [0, 0.5, 0.5, 1],
+                  }}
+                />
+                {!message ? (
+                  <span className="text-muted-foreground">{placeholder}</span>
+                ) : null}
+              </div>
+            )}
+          </div>
           <div
             className={cn(
               "mt-2 flex items-center",
@@ -225,16 +238,6 @@ export function AIChatCard({
               whileTap={{
                 scale: 0.88,
                 transition: { type: "spring", bounce: 0.5, duration: 0.4 },
-              }}
-              animate={
-                phase === "holding" && !userActive
-                  ? { scale: [1, 1.14, 1] }
-                  : { scale: 1 }
-              }
-              transition={{
-                duration: 0.5,
-                ease: "easeInOut",
-                times: [0, 0.35, 1],
               }}
               aria-label="Send message"
               className="group flex h-[30px] w-[30px] items-center justify-center rounded-[18px] bg-black text-white dark:bg-white dark:text-neutral-950"

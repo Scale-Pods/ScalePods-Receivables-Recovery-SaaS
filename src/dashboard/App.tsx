@@ -1602,7 +1602,6 @@ export function DashboardView({
       <CustomerRiskModal
         customer={selectedCustomerForRisk}
         onClose={() => setSelectedCustomerForRisk(null)}
-        onSaveRiskProfile={handleSaveRiskProfile}
       />
 
       {/* Customer Facing Payment Page Portal Modal (Feature #10) */}

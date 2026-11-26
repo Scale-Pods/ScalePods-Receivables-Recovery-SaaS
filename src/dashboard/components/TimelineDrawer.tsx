@@ -18,10 +18,14 @@ import {
 import { 
   Invoice, 
   CustomerProfile, 
-  PlanTier 
+  PlanTier,
+  OutreachFlow
 } from '../types/dashboard';
 import { formatINR } from '../utils/formatters';
 import { CompanyAvatar } from './CompanyAvatar';
+import { InvoiceOutreachFlow } from './InvoiceOutreachFlow';
+import { readStoredSequence } from '../../lib/invoiceWorkflow';
+import { buildRecoverySchedulePreview, defaultRecoverySequence } from '../../lib/recoverySchedule';
 
 interface TimelineDrawerProps {
   invoice: Invoice | null;
@@ -52,10 +56,8 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
   onInspectRisk,
   onApproveSettlement,
 }) => {
-  if (!invoice) return null;
-
   const isFreePlan = planTier === 'free';
-  const isPaid = invoice.status === 'paid' || invoice.currentStage === 'Done';
+  const isPaid = invoice?.status === 'paid' || invoice?.currentStage === 'Done';
 
   const getTimelineIcon = (type: string) => {
     switch (type) {
@@ -111,11 +113,35 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
     });
   }, [invoice?.timeline]);
 
+  // Prefer the cadence generated for this specific invoice. Older rows fall
+  // back to the locally saved/default sequence so the flow is never empty.
+  const outreachFlow = React.useMemo<OutreachFlow | null>(() => {
+    if (invoice?.outreachSequence?.steps?.length) return invoice.outreachSequence;
+    if (!invoice) return null;
+
+    const stored = typeof window !== 'undefined' ? readStoredSequence() : null;
+    const preview = buildRecoverySchedulePreview(
+      stored?.sequence || defaultRecoverySequence,
+      invoice.dueDate,
+    );
+
+    return {
+      source: stored ? 'local' : 'default',
+      ...(stored?.totalDays ? { totalDays: stored.totalDays } : {}),
+      steps: preview.steps.map((step) => ({
+        ...step,
+        scheduledDate: step.scheduled_date,
+      })),
+    };
+  }, [invoice]);
+
+  if (!invoice) return null;
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm flex justify-end animate-in fade-in duration-150">
       
       {/* Drawer */}
-      <div className="relative w-full max-w-xl bg-white dark:bg-[#101014] border-l border-zinc-200 dark:border-zinc-800 shadow-2xl h-full flex flex-col z-10 overflow-hidden">
+      <div className="relative w-full max-w-5xl bg-white dark:bg-[#101014] border-l border-zinc-200 dark:border-zinc-800 shadow-2xl h-full flex flex-col z-10 overflow-hidden">
         
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
@@ -158,8 +184,15 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
             </p>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
-            
+          <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+            {/* Sequence column: stays on the left of the invoice details on desktop. */}
+            {outreachFlow && (
+              <aside className="max-h-[45vh] w-full shrink-0 overflow-y-auto border-b border-zinc-200 bg-zinc-50/40 p-4 dark:border-zinc-800 dark:bg-zinc-950/40 lg:max-h-none lg:w-[340px] lg:border-b-0 lg:border-r">
+                <InvoiceOutreachFlow flow={outreachFlow} invoice={invoice} />
+              </aside>
+            )}
+
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 text-xs">
             {/* Overview Card */}
             <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-4 flex items-center justify-between">
               <div>
@@ -278,78 +311,26 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                   <Clock className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Move</span>
                 </button>
-
-                {customer && (
-                  <button
-                    type="button"
-                    onClick={() => onInspectRisk(customer)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Risk Profile</span>
-                  </button>
-                )}
               </div>
             </div>
 
-            {/* Customer Risk & Historical Reliability */}
-            {customer && (
-              <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-4">
-                <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
-                    Customer Risk & Cadence Profile
+            {/* Risk Profile: score + reason only, shown directly in the card. */}
+            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
+                  Risk Profile
+                </span>
+                <div className="flex items-baseline gap-1 font-mono">
+                  <span className="text-xl font-bold text-zinc-900 dark:text-white">
+                    {invoice.riskScore}
                   </span>
-
-                  <button
-                    onClick={() => onInspectRisk(customer)}
-                    className="text-xs text-zinc-900 dark:text-white font-medium hover:underline"
-                  >
-                    Edit / Lock →
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200">
-                      {customer.riskTier.toUpperCase()} • {customer.cadence.toUpperCase()} CADENCE
-                    </span>
-                    {customer.isLockedByOwner && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-500">
-                        <Lock className="w-3 h-3" />
-                        Locked
-                      </span>
-                    )}
-                  </div>
-
-                  <span className="font-mono font-bold text-sm text-zinc-900 dark:text-white">
-                    {customer.riskScore}/100
-                  </span>
-                </div>
-
-                <p className="text-zinc-600 dark:text-zinc-300 text-xs italic mb-2.5">
-                  "{customer.whyExplanation}"
-                </p>
-
-                <div className="grid grid-cols-4 gap-1.5 text-center text-[10px] text-zinc-500 font-mono">
-                  <div className="p-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                    <div>Late Count</div>
-                    <div className="font-bold text-zinc-800 dark:text-zinc-200 text-xs">{customer.historyFactors.latePaymentsCount}</div>
-                  </div>
-                  <div className="p-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                    <div>Avg Days Late</div>
-                    <div className="font-bold text-zinc-800 dark:text-zinc-200 text-xs">{customer.historyFactors.avgDaysLate}d</div>
-                  </div>
-                  <div className="p-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                    <div>Promises Kept</div>
-                    <div className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">{customer.historyFactors.promisesKept}</div>
-                  </div>
-                  <div className="p-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                    <div>Broken</div>
-                    <div className="font-bold text-rose-600 dark:text-rose-400 text-xs">{customer.historyFactors.promisesBroken}</div>
-                  </div>
+                  <span className="text-[10px] text-zinc-400">/ 100</span>
                 </div>
               </div>
-            )}
+              <p className="mt-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
+                {invoice.riskReason || customer?.riskReason || 'No risk reason recorded.'}
+              </p>
+            </div>
 
             {/* Proof Slip Preview Card */}
             {invoice.hasProofFile && invoice.proofFile && (
@@ -408,7 +389,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                 ))}
               </div>
             </div>
-
+            </div>
           </div>
         )}
 

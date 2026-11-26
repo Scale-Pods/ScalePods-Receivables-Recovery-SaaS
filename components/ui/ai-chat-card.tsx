@@ -26,6 +26,8 @@ export interface AIChatCardProps {
   showAttach?: boolean;
   /** Small node shown before the subtitle, e.g. an online indicator. */
   statusIndicator?: React.ReactNode;
+  /** Extra header control, e.g. an expand/collapse button. */
+  headerAction?: React.ReactNode;
   /** Optional body content (e.g. a chat transcript). Replaces the empty state. */
   children?: React.ReactNode;
   className?: string;
@@ -52,6 +54,7 @@ export function AIChatCard({
   onAttach,
   showAttach = true,
   statusIndicator,
+  headerAction,
   children,
   className,
 }: AIChatCardProps) {
@@ -103,26 +106,29 @@ export function AIChatCard({
             <span>{subtitle}</span>
           </p>
         </div>
-        <motion.button
-          type="button"
-          onClick={() => {
-            setSpins((count) => count + 1);
-            setUserActive(false);
-            setUserMessage("");
-            onReset?.();
-          }}
-          whileTap={{ scale: 0.9 }}
-          aria-label="Reset conversation"
-          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[18px] border border-border bg-white text-muted-foreground transition-colors hover:text-foreground dark:bg-neutral-950"
-        >
-          <motion.span
-            animate={{ rotate: spins * 360 }}
-            transition={{ type: "spring", bounce: 0.2, duration: 0.7 }}
-            className="flex"
+        <div className="flex shrink-0 items-center gap-1.5">
+          {headerAction}
+          <motion.button
+            type="button"
+            onClick={() => {
+              setSpins((count) => count + 1);
+              setUserActive(false);
+              setUserMessage("");
+              onReset?.();
+            }}
+            whileTap={{ scale: 0.9 }}
+            aria-label="Reset conversation"
+            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[18px] border border-border bg-white text-muted-foreground transition-colors hover:text-foreground dark:bg-neutral-950"
           >
-            <RefreshCw className="h-4 w-4" />
-          </motion.span>
-        </motion.button>
+            <motion.span
+              animate={{ rotate: spins * 360 }}
+              transition={{ type: "spring", bounce: 0.2, duration: 0.7 }}
+              className="flex"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </motion.span>
+          </motion.button>
+        </div>
       </div>
 
       {/* Empty state, or a custom body such as a chat transcript */}

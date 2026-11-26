@@ -135,18 +135,22 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
     }
 
     return (
-      <div 
-        onClick={(e) => {
-          e.stopPropagation();
-          onInspectRisk(inv);
-        }}
-        className="inline-flex items-center gap-1.5 cursor-pointer"
-        title={inv.riskReason ? `Score: ${inv.riskScore} (${label})\nReason: ${inv.riskReason}` : `Score: ${inv.riskScore} (${label}) - Click to inspect risk`}
-      >
-        <span className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-md border ${colorClass} flex items-center gap-1 hover:opacity-80 transition-opacity`}>
+      <div className="flex max-w-[200px] flex-col items-start gap-1">
+        <span
+          className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-md border ${colorClass} flex items-center gap-1`}
+          title={`Score: ${inv.riskScore} (${label})`}
+        >
           <span>{inv.riskScore}</span>
           {inv.isLockedByOwner && <Lock className="w-3 h-3 ml-0.5 text-amber-500" />}
         </span>
+        {inv.riskReason && (
+          <span
+            className="line-clamp-2 text-[10px] leading-4 text-zinc-500 dark:text-zinc-400"
+            title={inv.riskReason}
+          >
+            {inv.riskReason}
+          </span>
+        )}
       </div>
     );
   };

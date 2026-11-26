@@ -53,6 +53,23 @@ export interface CustomerProfile {
   }[];
 }
 
+export interface OutreachFlowStep {
+  id?: string;
+  /** Positive days are days overdue; negative days fall before the due date. */
+  day: number;
+  phase?: 'before_due' | 'after_due';
+  stage: string;
+  channels: ChannelType[];
+  headline: string;
+  scheduledDate: string;
+}
+
+export interface OutreachFlow {
+  source: 'saved' | 'local' | 'default';
+  totalDays?: number;
+  steps: OutreachFlowStep[];
+}
+
 export interface TimelineEvent {
   id: string;
   timestamp: string;
@@ -127,6 +144,8 @@ export interface Invoice {
     status: 'pending_owner' | 'accepted' | 'declined';
   };
   timeline: TimelineEvent[];
+  /** Per-invoice outreach cadence, rendered as a flow when the ledger row is opened. */
+  outreachSequence?: OutreachFlow;
 }
 
 export interface FocusItem {

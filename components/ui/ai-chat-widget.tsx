@@ -2,7 +2,15 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bot, Image as ImageIcon, MessageCircle, UserRound, X } from "lucide-react";
+import {
+  Bot,
+  Image as ImageIcon,
+  Maximize2,
+  MessageCircle,
+  Minimize2,
+  UserRound,
+  X,
+} from "lucide-react";
 
 import { AIChatCard } from "@/components/ui/ai-chat-card";
 import {
@@ -87,11 +95,13 @@ function ChatImage({
   src,
   href,
   label,
+  expanded,
   onLoad: handleLoad,
 }: {
   src: string;
   href: string;
   label: string;
+  expanded: boolean;
   onLoad?: () => void;
 }) {
   const [failed, setFailed] = React.useState(false);
@@ -112,13 +122,12 @@ function ChatImage({
   }
 
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-2 block overflow-hidden rounded-xl border border-black/10 dark:border-white/10"
-      title="Open reference image in a new tab"
+    <div
+      title="Reference image"
+      className="mt-2 flex w-full items-center justify-center overflow-hidden rounded-xl border border-black/10 bg-neutral-50 p-1 dark:border-white/10 dark:bg-neutral-900/40"
     >
+      {/* No anchor around the image: clicking a reference never navigates away.
+          Width/height stay auto so 9:16, 16:9, and any other ratio fit whole. */}
       <img
         src={src}
         alt="Reference image"
@@ -126,9 +135,12 @@ function ChatImage({
         decoding="async"
         onLoad={handleLoad}
         onError={() => setFailed(true)}
-        className="h-32 w-full rounded-lg bg-neutral-100 object-contain dark:bg-neutral-800"
+        className={cn(
+          "h-auto w-auto max-w-full rounded-lg object-contain",
+          expanded ? "max-h-[420px]" : "max-h-56",
+        )}
       />
-    </a>
+    </div>
   );
 }
 
@@ -136,6 +148,7 @@ function ChatImage({
 function renderMessageContent(
   content: string,
   isUser: boolean,
+  expanded: boolean,
   onImageLoad?: () => void,
 ): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
@@ -165,6 +178,7 @@ function renderMessageContent(
           src={imageSrc}
           href={url}
           label={text}
+          expanded={expanded}
           onLoad={onImageLoad}
         />,
       );
@@ -197,6 +211,7 @@ export function AIChatWidget({ uid }: { uid?: string }) {
   const resolvedUid = uid ?? getCurrentUserUid();
 
   const [open, setOpen] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(false);
   const [activeUid, setActiveUid] = React.useState(resolvedUid);
   const [messages, setMessages] = React.useState<TranscriptMessage[]>(() =>
     toTranscript(resolvedUid),
@@ -339,7 +354,12 @@ export function AIChatWidget({ uid }: { uid?: string }) {
     <>
       <AnimatePresence>
         {open ? (
-          <div className="pointer-events-none fixed inset-x-3 bottom-[92px] z-50 flex justify-end sm:inset-x-auto sm:bottom-24 sm:right-6">
+          <div
+            className={cn(
+              "pointer-events-none fixed inset-x-3 z-50 flex justify-end sm:inset-x-auto sm:right-6",
+              expanded ? "bottom-[84px] sm:bottom-6" : "bottom-[92px] sm:bottom-24",
+            )}
+          >
             <motion.div
               role="dialog"
               aria-label="Sia Virtual Assistant"
@@ -347,13 +367,37 @@ export function AIChatWidget({ uid }: { uid?: string }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.96 }}
               transition={{ type: "spring", bounce: 0.18, duration: 0.35 }}
-              className="pointer-events-auto w-full max-w-[360px] origin-bottom-right"
+              className={cn(
+                "pointer-events-auto w-full origin-bottom-right transition-[max-width] duration-200",
+                expanded ? "max-w-[min(720px,calc(100vw-24px))]" : "max-w-[360px]",
+              )}
             >
               <AIChatCard
                 key={composerKey}
-                className="ai-chat-widget-card h-[min(520px,calc(100dvh-120px))] max-h-[560px] overflow-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10"
+                className={cn(
+                  "ai-chat-widget-card overflow-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10",
+                  expanded
+                    ? "h-[min(760px,calc(100dvh-96px))] max-h-[820px]"
+                    : "h-[min(520px,calc(100dvh-120px))] max-h-[560px]",
+                )}
                 title="Sia"
                 subtitle={subtitle}
+                headerAction={
+                  <motion.button
+                    type="button"
+                    onClick={() => setExpanded((value) => !value)}
+                    whileTap={{ scale: 0.9 }}
+                    aria-label={expanded ? "Collapse chat" : "Expand chat"}
+                    title={expanded ? "Collapse chat" : "Expand chat"}
+                    className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[18px] border border-border bg-white text-muted-foreground transition-colors hover:text-foreground dark:bg-neutral-950"
+                  >
+                    {expanded ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
+                  </motion.button>
+                }
                 statusIndicator={
                   <span className="relative flex h-2 w-2">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
@@ -425,7 +469,12 @@ export function AIChatWidget({ uid }: { uid?: string }) {
                             : "rounded-2xl rounded-bl-sm border border-border bg-white text-foreground dark:bg-neutral-900",
                         )}
                       >
-                        {renderMessageContent(item.content, item.role === "user", scrollToBottom)}
+                        {renderMessageContent(
+                          item.content,
+                          item.role === "user",
+                          expanded,
+                          scrollToBottom,
+                        )}
                       </div>
                       {item.role === "user" ? (
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">

@@ -9,8 +9,11 @@ import {
   CustomerRiskTier,
   ChannelType,
   TimelineEvent,
-  ProofFile
+  ProofFile,
+  OutreachFlow,
+  OutreachFlowStep
 } from '../dashboard/types/dashboard';
+import { normalizeRecoverySequence } from './recoverySchedule';
 
 // --------------------------------------------------------------------------
 // Consolidated Recovery Outreach Table
@@ -41,6 +44,79 @@ export function getEscalationValue(row: any): string {
   const raw = row?.Escalation ?? row?.escalation;
   if (raw === null || raw === undefined) return '';
   return String(raw).trim();
+}
+
+function normalizeConfigDate(value: unknown): string {
+  const str = String(value || '').trim();
+  if (!str) return '';
+  const iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+  const indian = str.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+  if (indian) {
+    const year = indian[3].length === 2 ? `20${indian[3]}` : indian[3];
+    return `${year}-${indian[2].padStart(2, '0')}-${indian[1].padStart(2, '0')}`;
+  }
+  return '';
+}
+
+function deriveStepDate(dueDate: string, day: number): string {
+  const base = normalizeConfigDate(dueDate);
+  if (!base) return '';
+  const date = new Date(`${base}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + day);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Turn the outreach row's saved cadence into the flow rendered by the drawer. */
+function parseOutreachFlow(row: any, dueDate: string): OutreachFlow | undefined {
+  const raw = row?.custom_sequence_config ?? row?.Custom_Sequence_Config;
+  if (!raw) return undefined;
+
+  let parsed: any = raw;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+  }
+
+  const rawSteps = Array.isArray(parsed?.sequence) ? parsed.sequence : [];
+  if (rawSteps.length === 0) return undefined;
+
+  const normalized = normalizeRecoverySequence(rawSteps);
+  if (normalized.length === 0) return undefined;
+
+  const steps: OutreachFlowStep[] = normalized.map((step, index) => {
+    const sourceStep =
+      rawSteps.find(
+        (candidate: any) =>
+          step.id && String(candidate?.id || '') === String(step.id),
+      ) ||
+      rawSteps.find((candidate: any) => Number(candidate?.day) === step.day) ||
+      rawSteps[index];
+
+    return {
+      ...step,
+      channels: step.channels as OutreachFlowStep['channels'],
+      scheduledDate:
+        normalizeConfigDate(sourceStep?.scheduled_date) ||
+        deriveStepDate(dueDate, step.day),
+    };
+  });
+
+  const sourceLabel = String(parsed?.source || '').toLowerCase();
+  const totalDays = Number(parsed?.totalDays);
+  return {
+    source:
+      sourceLabel === 'local'
+        ? 'local'
+        : sourceLabel === 'fallback'
+          ? 'default'
+          : 'saved',
+    ...(Number.isFinite(totalDays) && totalDays > 0 ? { totalDays } : {}),
+    steps,
+  };
 }
 
 export function recoveryRowToInvoice(row: any): Invoice {
@@ -296,6 +372,7 @@ export function recoveryRowToInvoice(row: any): Invoice {
     disputeReason: row.dispute_reason || (row.dispute === 'yes' ? 'Dispute flagged during recovery' : undefined),
     promisedDate: row.Payment_Date,
     timeline,
+    outreachSequence: parseOutreachFlow(row, dueDate || row.due_date || ''),
   };
 }
 

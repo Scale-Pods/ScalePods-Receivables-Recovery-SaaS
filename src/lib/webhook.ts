@@ -30,7 +30,93 @@ export interface CreateOrderResponse {
   amountInPaise: number | null;
   currency: string;
   keyId?: string | null;
+  /** True when the n8n response explicitly reports success. */
+  success?: boolean;
   rawResponse?: any;
+}
+
+/**
+ * Shape returned by the purchase webhook after payment confirmation, e.g.
+ * `{ success: true, order_id: $json.id, amount: $json.amount, currency: $json.currency, key_id: "rzp_live_..." }`
+ */
+export interface PlanWebhookResponse {
+  success: boolean;
+  orderId: string | null;
+  amountInPaise: number | null;
+  currency: string;
+  keyId: string | null;
+  raw: any;
+}
+
+export interface PaymentVerificationWebhookResult extends PlanWebhookResponse {
+  /** Whether the webhook accepted the request (including no-cors fallback). */
+  delivered: boolean;
+}
+
+/**
+ * n8n "Respond to Webhook" can return a plain object, an array, or `{ data: [...] }`.
+ * Flatten those shapes and normalize snake_case/camelCase Razorpay fields so the
+ * browser can reliably read success, order_id, amount, currency and key_id.
+ */
+function parsePlanWebhookResponse(rawText: string, fallbackAmountInPaise: number): PlanWebhookResponse {
+  const empty: PlanWebhookResponse = {
+    success: false,
+    orderId: null,
+    amountInPaise: fallbackAmountInPaise,
+    currency: 'INR',
+    keyId: null,
+    raw: null,
+  };
+
+  if (!rawText) return empty;
+
+  let json: any;
+  try {
+    json = JSON.parse(rawText);
+  } catch {
+    return empty;
+  }
+
+  let obj: any = Array.isArray(json) ? json[0] : json;
+  if (obj && typeof obj === 'object' && obj.data) {
+    const nested = Array.isArray(obj.data) ? obj.data[0] : obj.data;
+    if (nested && typeof nested === 'object') {
+      // Keep top-level flags (success/key_id) while exposing nested order fields.
+      obj = { ...obj, ...nested };
+    }
+  }
+  if (!obj || typeof obj !== 'object') return empty;
+
+  const rawOrderId = obj.order_id ?? obj.orderId ?? obj.id ?? null;
+  const orderId =
+    typeof rawOrderId === 'string' && rawOrderId.trim() ? rawOrderId.trim() : null;
+
+  let amountInPaise = fallbackAmountInPaise;
+  const rawAmount = obj.amount ?? obj.amountInPaise ?? null;
+  if (rawAmount !== null && rawAmount !== undefined && rawAmount !== '') {
+    const parsedAmount = Number(String(rawAmount).replace(/[^0-9.]/g, ''));
+    if (!Number.isNaN(parsedAmount)) amountInPaise = Math.round(parsedAmount);
+  }
+
+  const status = String(obj.status || '').toLowerCase();
+  const success =
+    obj.success === true ||
+    obj.success === 'true' ||
+    status === 'success' ||
+    status === 'payment_successful' ||
+    status === 'captured';
+
+  const keyCandidate = obj.key_id ?? obj.keyId ?? obj.key ?? null;
+
+  return {
+    success,
+    orderId,
+    amountInPaise,
+    currency:
+      typeof obj.currency === 'string' && obj.currency.trim() ? obj.currency.trim() : 'INR',
+    keyId: typeof keyCandidate === 'string' && keyCandidate.startsWith('rzp_') ? keyCandidate : null,
+    raw: obj,
+  };
 }
 
 export interface PaymentVerificationPayload {
@@ -115,29 +201,18 @@ export async function createRazorpayOrderViaWebhook(data: CreateOrderRequest): P
     });
 
     if (res.ok) {
-      const text = await res.text();
-      if (text) {
-        try {
-          const json = JSON.parse(text);
-          // Handle arrays like [ { id: "order_TzHLTod6pfIkUp", amount: 100, currency: "INR" } ] or objects
-          const orderObj = Array.isArray(json) ? json[0] : (json.data?.[0] || json.data || json);
-          const orderId = orderObj?.id || orderObj?.order_id || orderObj?.orderId || null;
-          const returnedAmount = orderObj?.amount !== undefined ? Number(orderObj.amount) : amountInPaise;
-          const returnedCurrency = orderObj?.currency || 'INR';
-          const returnedKeyId = orderObj?.key_id || orderObj?.keyId || orderObj?.key || null;
-
-          if (orderId && typeof orderId === 'string' && orderId.startsWith('order_')) {
-            return {
-              orderId,
-              amountInPaise: returnedAmount,
-              currency: returnedCurrency,
-              keyId: returnedKeyId,
-              rawResponse: orderObj,
-            };
-          }
-        } catch (parseErr) {
-          console.warn('Order JSON parsing notice:', parseErr);
-        }
+      const parsed = parsePlanWebhookResponse(await res.text(), amountInPaise);
+      // Both the old `{ id: "order_..." }` and the new `{ success: true, order_id: ... }`
+      // responses are handled by the shared parser above.
+      if (parsed.orderId && parsed.orderId.startsWith('order_')) {
+        return {
+          orderId: parsed.orderId,
+          amountInPaise: parsed.amountInPaise,
+          currency: parsed.currency,
+          keyId: parsed.keyId,
+          success: parsed.success,
+          rawResponse: parsed.raw,
+        };
       }
     }
   } catch (err) {
@@ -148,16 +223,20 @@ export async function createRazorpayOrderViaWebhook(data: CreateOrderRequest): P
     orderId: null,
     amountInPaise,
     currency: 'INR',
+    success: false,
   };
 }
 
 /**
  * Sends completed payment details (payment_id, order_id, signature) to backend/n8n for verification
  */
-export async function sendPaymentVerificationWebhook(data: PaymentVerificationPayload): Promise<void> {
+export async function sendPaymentVerificationWebhook(
+  data: PaymentVerificationPayload
+): Promise<PaymentVerificationWebhookResult> {
   const webhookUrl =
     import.meta.env.VITE_N8N_PURCHASE_WEBHOOK_URL ||
     DEFAULT_WEBHOOK_URL;
+  const fallbackAmountInPaise = Math.round(data.amount * 100);
 
   const payload = {
     action: 'verify_payment',
@@ -176,13 +255,17 @@ export async function sendPaymentVerificationWebhook(data: PaymentVerificationPa
   };
 
   try {
-    await fetch(webhookUrl, {
+    const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     });
+    return {
+      ...parsePlanWebhookResponse(await res.text(), fallbackAmountInPaise),
+      delivered: res.ok,
+    };
   } catch (err) {
     try {
       await fetch(webhookUrl, {
@@ -193,8 +276,28 @@ export async function sendPaymentVerificationWebhook(data: PaymentVerificationPa
         },
         body: JSON.stringify(payload),
       });
+      // no-cors responses cannot be read, so success is reported by the
+      // Razorpay payment handler rather than by this webhook response.
+      return {
+        success: false,
+        orderId: data.razorpay_order_id || null,
+        amountInPaise: fallbackAmountInPaise,
+        currency: 'INR',
+        keyId: null,
+        raw: null,
+        delivered: true,
+      };
     } catch (fallbackErr) {
       console.warn('Payment verification delivery error:', fallbackErr);
+      return {
+        success: false,
+        orderId: data.razorpay_order_id || null,
+        amountInPaise: fallbackAmountInPaise,
+        currency: 'INR',
+        keyId: null,
+        raw: null,
+        delivered: false,
+      };
     }
   }
 }

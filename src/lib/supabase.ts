@@ -189,7 +189,7 @@ export async function signUpUser(params: {
         name: createdRow.Name || fullName,
         companyName: createdRow.companyName || companyName,
         companyLogo: createdRow.companyLogo || undefined,
-        planTier: (createdRow.Tier?.toLowerCase() || 'free') as PlanTierType,
+        planTier: ((createdRow.Tier ?? createdRow.tier)?.toLowerCase() || 'free') as PlanTierType,
         billingCycle: 'monthly',
         role: assignedRole,
         isOwner: isOrgOwner || assignedRole === 'owner',
@@ -325,7 +325,7 @@ export async function signInUser(params: {
         name: userRow.Name || 'Admin',
         companyName: userRow.companyName || 'My Enterprise',
         companyLogo: userRow.companyLogo || undefined,
-        planTier: (userRow.Tier?.toLowerCase() || 'free') as PlanTierType,
+        planTier: ((userRow.Tier ?? userRow.tier)?.toLowerCase() || 'free') as PlanTierType,
         billingCycle: 'monthly',
         role: assignedRole,
         createdAt: userRow.created_at || new Date().toISOString(),
@@ -395,6 +395,76 @@ export async function signOutUser(): Promise<void> {
     }
   }
   localStorage.removeItem(STORAGE_KEY_USER);
+}
+
+/**
+ * Reads the authoritative account state from Supabase. The browser keeps a
+ * cached session in localStorage, so a tier edited directly in the Credentials
+ * table would otherwise never be reflected in the UI.
+ */
+async function readCredentialsRow(applyFilter: (query: any) => any): Promise<any | null> {
+  if (!supabase) return null;
+
+  // Older tables may only have one of these columns; try each set in order.
+  const columnSets = [
+    'Tier, tier, uid, customer_uid, id',
+    'Tier, uid, customer_uid, id',
+    'tier, uid, customer_uid, id',
+  ];
+
+  for (const columns of columnSets) {
+    try {
+      const { data, error } = await applyFilter(
+        supabase.from('Credentials').select(columns)
+      ).maybeSingle();
+      if (!error && data) return data;
+    } catch {
+      // Column not present in this schema; try the next set.
+    }
+  }
+  return null;
+}
+
+export async function fetchRemoteAccountState(
+  user: Pick<UserAccount, 'email' | 'customer_uid' | 'uid' | 'id'>
+): Promise<{ tier: PlanTierType | null; uid: string | null } | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+
+  const planTiers: PlanTierType[] = ['free', 'basic', 'growth', 'enterprise'];
+
+  const normalize = (row: any) => {
+    const rawTier = row?.Tier ?? row?.tier ?? '';
+    const tierValue = String(rawTier).trim().toLowerCase() as PlanTierType;
+    const rawUid = row?.customer_uid ?? row?.uid ?? row?.id;
+    return {
+      tier: planTiers.includes(tierValue) ? tierValue : null,
+      uid: rawUid !== undefined && rawUid !== null ? String(rawUid) : null,
+    };
+  };
+
+  try {
+    const email = (user.email || '').trim().toLowerCase();
+    if (email) {
+      const byEmail = await readCredentialsRow((query) => query.ilike('Email', email));
+      if (byEmail) return normalize(byEmail);
+    }
+
+    const uid = user.customer_uid || user.uid || '';
+    if (uid && uid !== 'local_user') {
+      const byUid = await readCredentialsRow((query) => query.eq('uid', uid));
+      if (byUid) return normalize(byUid);
+    }
+
+    const numericId = Number(user.id);
+    if (!Number.isNaN(numericId) && numericId > 0) {
+      const byId = await readCredentialsRow((query) => query.eq('id', numericId));
+      if (byId) return normalize(byId);
+    }
+  } catch (err) {
+    console.warn('Unable to refresh account state from Supabase:', err);
+  }
+
+  return null;
 }
 
 /**

@@ -29,7 +29,7 @@ interface TierPurchaseModalProps {
   isAnnual?: boolean;
   currentUser: UserAccount | null;
   onClose: () => void;
-  onUpgradeSuccess: (newTier: PlanTierType, cycle: 'monthly' | 'annual') => void;
+  onUpgradeSuccess: (newTier: PlanTierType, cycle: 'monthly' | 'annual') => void | Promise<void>;
   onRequireAuth: () => void;
 }
 
@@ -54,6 +54,8 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
   const [billingAnnual, setBillingAnnual] = useState<boolean>(isAnnual);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [upgradeOrderId, setUpgradeOrderId] = useState<string | null>(null);
+  const [isWebhookConfirmed, setIsWebhookConfirmed] = useState(false);
 
   const loadPlans = useCallback(async () => {
     setPricingError(false);
@@ -99,6 +101,8 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
     setBillingAnnual(isAnnual);
     setIsComplete(false);
     setIsProcessing(false);
+    setUpgradeOrderId(null);
+    setIsWebhookConfirmed(false);
   }, [isOpen, plan, isAnnual, currentTier]);
 
   if (!isOpen) return null;
@@ -203,6 +207,18 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
   );
   const targetDiscountPercent = yearlyDiscountPercent(targetPlan);
 
+  // Persist the purchased tier, land on the dashboard and reload so all
+  // plan-gated features are re-evaluated from the upgraded account.
+  const handleUpgradeAcknowledged = async () => {
+    await Promise.resolve(
+      onUpgradeSuccess(targetPlan.id, billingAnnual ? 'annual' : 'monthly')
+    );
+    if (window.location.pathname !== '/dashboard') {
+      window.history.replaceState({ view: 'dashboard' }, '', '/dashboard');
+    }
+    window.location.reload();
+  };
+
   // Select a plan card in matrix
   const handlePlanCardClick = (tier: PlanEntitlement) => {
     setSelectedTierId(tier.id);
@@ -284,10 +300,11 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
       userName: currentUser.name,
       onSuccess: async (response) => {
         setIsProcessing(false);
-        setIsComplete(true);
 
-        // 3. Send payment details (payment_id, order_id, signature) for verification
-        await sendPaymentVerificationWebhook({
+        // 3. Send payment details (payment_id, order_id, signature) for verification.
+        // The n8n webhook responds with `{ success, order_id, amount, currency, key_id }`;
+        // the upgrade dialog appears once that response is received.
+        const verification = await sendPaymentVerificationWebhook({
           razorpay_payment_id: response.razorpay_payment_id,
           razorpay_order_id: response.razorpay_order_id || generatedOrderId || undefined,
           razorpay_signature: response.razorpay_signature,
@@ -300,6 +317,13 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
           amount: payableAmount,
         });
 
+        const resolvedOrderId =
+          verification.orderId || response.razorpay_order_id || generatedOrderId;
+        setUpgradeOrderId(
+          resolvedOrderId && resolvedOrderId.startsWith('order_') ? resolvedOrderId : null
+        );
+        setIsWebhookConfirmed(Boolean(verification.success));
+
         // Confetti celebration
         confetti({
           particleCount: 100,
@@ -307,8 +331,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
           origin: { y: 0.6 }
         });
 
-        // Synchronize with database and active session
-        onUpgradeSuccess(targetPlan.id, billingAnnual ? 'annual' : 'monthly');
+        setIsComplete(true);
       },
       onDismiss: () => {
         setIsProcessing(false);
@@ -331,7 +354,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
 
         {/* Close Button */}
         <button
-          onClick={onClose}
+          onClick={isComplete ? handleUpgradeAcknowledged : onClose}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors cursor-pointer"
           aria-label="Close upgrade modal"
         >
@@ -578,21 +601,40 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
             </div>
 
             <h3 className="text-2xl font-black text-white">
-              Payment Confirmed & Plan Upgraded!
+              Your plan has been upgraded!
             </h3>
 
             <p className="text-xs text-zinc-300 max-w-md mx-auto leading-relaxed">
-              <strong>{currentUser.companyName}</strong> is now successfully switched to the <strong className="text-purple-300">{targetPlan.name} Tier</strong>. 
-              Your Supabase credentials have been updated, and higher limits are now active.
+              <strong>{currentUser.companyName}</strong> is now on the <strong className="text-purple-300">{targetPlan.name} Tier</strong>.
+              Your higher limits and plan features are ready.
             </p>
 
-            <div className="pt-3">
+            {upgradeOrderId && (
+              <p className="text-[11px] font-mono text-zinc-500">
+                Order ID: <span className="text-zinc-300">{upgradeOrderId}</span>
+              </p>
+            )}
+
+            {isFreePlan ? (
+              <p className="text-[11px] text-zinc-500">Your workspace is now on the Free Tier.</p>
+            ) : isCustomPrice ? (
+              <p className="text-[11px] text-zinc-500">Enterprise activation has been requested.</p>
+            ) : isWebhookConfirmed ? (
+              <p className="text-[11px] text-emerald-400">Payment verified by ScalePods.</p>
+            ) : (
+              <p className="text-[11px] text-zinc-500">Payment received. Plan activation is being synced.</p>
+            )}
+
+            <div className="pt-3 space-y-2">
               <button
-                onClick={onClose}
-                className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 shadow-md shadow-purple-600/30 transition-colors cursor-pointer"
+                onClick={handleUpgradeAcknowledged}
+                className="px-8 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 shadow-md shadow-purple-600/30 transition-colors cursor-pointer"
               >
-                Close & Return to Dashboard
+                OK
               </button>
+              <p className="text-[11px] text-zinc-500">
+                Click OK to refresh and open {targetPlan.name} features in your dashboard.
+              </p>
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ArchitectureSection } from './components/ArchitectureSection';
@@ -12,7 +12,12 @@ import { UserAccount, PlanTierType, STORAGE_KEY_USER } from './types/auth';
 import { PricingPlan, pricingPlans } from './data/landingData';
 import { DashboardView } from './dashboard/App';
 import { isDashboardPath } from './dashboard/routes';
-import { signOutUser, updatePlanTierInSupabase, isSupabaseConfigured, supabase } from './lib/supabase';
+import {
+  signOutUser,
+  updatePlanTierInSupabase,
+  fetchRemoteAccountState,
+  isSupabaseConfigured,
+} from './lib/supabase';
 import { OAuthCallbackHandler } from './components/OAuthCallbackHandler';
 
 export function App() {
@@ -49,46 +54,80 @@ export function App() {
   const [selectedPlanForPurchase, setSelectedPlanForPurchase] = useState<PricingPlan | null>(null);
   const [purchaseIsAnnual, setPurchaseIsAnnual] = useState(true);
 
-  // Load user from localStorage or Supabase session on mount
+  // localStorage is only a cache. The Credentials table is authoritative for
+  // the plan tier, so re-read it on load and whenever the tab regains focus
+  // (e.g. after changing Tier directly in the Supabase table editor).
+  const syncUserFromSupabase = useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_USER);
+      if (!stored) return;
+      const cached: UserAccount = JSON.parse(stored);
+      const remote = await fetchRemoteAccountState(cached);
+      if (!remote || (!remote.tier && !remote.uid)) return;
+
+      const needsTier = Boolean(remote.tier && cached.planTier !== remote.tier);
+      const needsUid = Boolean(remote.uid && (!cached.customer_uid || !cached.uid));
+      if (needsTier || needsUid) {
+        const updated: UserAccount = {
+          ...cached,
+          ...(needsTier && remote.tier ? { planTier: remote.tier } : {}),
+          ...(needsUid && remote.uid ? { customer_uid: remote.uid, uid: remote.uid } : {}),
+        };
+        try {
+          localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
+        } catch {}
+      }
+
+      setCurrentUser((prev) => {
+        if (!prev) return cached;
+        const tierChanged = Boolean(remote.tier && prev.planTier !== remote.tier);
+        const uidChanged = Boolean(remote.uid && (!prev.customer_uid || !prev.uid));
+        if (!tierChanged && !uidChanged) return prev;
+        return {
+          ...prev,
+          ...(tierChanged && remote.tier ? { planTier: remote.tier } : {}),
+          ...(uidChanged && remote.uid ? { customer_uid: remote.uid, uid: remote.uid } : {}),
+        };
+      });
+    } catch (err) {
+      console.warn('Failed to sync account from Supabase:', err);
+    }
+  }, []);
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_USER);
       if (stored) {
-        const parsed: UserAccount = JSON.parse(stored);
-        setCurrentUser(parsed);
-
-        // Auto-upgrade session with customer_uid from Credentials if missing
-        if (!parsed.customer_uid && parsed.email && isSupabaseConfigured && supabase) {
-          (async () => {
-            try {
-              const { data } = await supabase
-                .from('Credentials')
-                .select('uid, id')
-                .ilike('Email', parsed.email.trim().toLowerCase())
-                .maybeSingle();
-
-              if (data && (data.uid || data.id)) {
-                const uidVal = String(data.uid || data.id);
-                const upgraded: UserAccount = {
-                  ...parsed,
-                  customer_uid: uidVal,
-                  uid: uidVal,
-                };
-                setCurrentUser(upgraded);
-                try {
-                  localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(upgraded));
-                } catch {}
-              }
-            } catch (upgradeErr) {
-              console.warn('Session upgrade notice:', upgradeErr);
-            }
-          })();
-        }
+        setCurrentUser(JSON.parse(stored));
       }
     } catch (err) {
       console.warn('Failed to parse stored user', err);
     }
-  }, []);
+    void syncUserFromSupabase();
+  }, [syncUserFromSupabase]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let lastSync = 0;
+    const syncIfStale = () => {
+      const now = Date.now();
+      if (now - lastSync < 5000) return;
+      lastSync = now;
+      void syncUserFromSupabase();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') syncIfStale();
+    };
+    window.addEventListener('focus', syncIfStale);
+    window.addEventListener('pageshow', syncIfStale);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', syncIfStale);
+      window.removeEventListener('pageshow', syncIfStale);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [syncUserFromSupabase]);
 
   // Synchronize route with URL (supports /upgrade, dashboard page routes, and /)
   useEffect(() => {

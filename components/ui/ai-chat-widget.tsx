@@ -29,7 +29,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 const INTRO_PROMPT =
-  "Ask about invoices, recovery workflows, or your plan — I'll check with the Recovr assistant.";
+  "Ask about invoices, recovery workflows, or your plan — Sia is here to help.";
 
 function toTranscript(uid: string): TranscriptMessage[] {
   return loadChatHistory(uid).map((turn, index) => ({
@@ -112,7 +112,7 @@ export function AIChatWidget({ uid }: { uid?: string }) {
       ? "Please try again in a moment"
       : hasHistory
         ? "Saved on this device"
-        : "Recovr support assistant";
+        : "Virtual Assistant";
 
   const handleSend = async (message: string) => {
     const trimmed = message.trim();
@@ -185,7 +185,7 @@ export function AIChatWidget({ uid }: { uid?: string }) {
           <div className="pointer-events-none fixed inset-x-3 bottom-[92px] z-50 flex justify-end sm:inset-x-auto sm:bottom-24 sm:right-6">
             <motion.div
               role="dialog"
-              aria-label="Recovr assistant"
+              aria-label="Sia Virtual Assistant"
               initial={{ opacity: 0, y: 16, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.96 }}
@@ -195,7 +195,7 @@ export function AIChatWidget({ uid }: { uid?: string }) {
               <AIChatCard
                 key={composerKey}
                 className="ai-chat-widget-card h-[min(520px,calc(100dvh-120px))] max-h-[560px] overflow-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10"
-                title="Recovr Assistant"
+                title="Sia"
                 subtitle={subtitle}
                 statusIndicator={
                   <span className="relative flex h-2 w-2">
@@ -323,7 +323,7 @@ export function AIChatWidget({ uid }: { uid?: string }) {
         className="group fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-[0_12px_32px_-8px_rgba(124,58,237,0.65)] ring-1 ring-white/25 transition-shadow hover:shadow-[0_16px_40px_-8px_rgba(124,58,237,0.8)]"
       >
         <span className="pointer-events-none absolute right-16 hidden whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-white dark:text-neutral-900 sm:block">
-          Chat with Recovr
+          Chat with Sia
         </span>
         <AnimatePresence mode="wait" initial={false}>
           <motion.span

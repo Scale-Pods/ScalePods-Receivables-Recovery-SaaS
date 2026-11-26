@@ -199,27 +199,63 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                   </button>
                 )}
 
-                {invoice.hasProofFile && (
+                {invoice.hasProofFile ? (
                   <button
+                    type="button"
                     onClick={() => onViewProof(invoice)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 flex items-center gap-1.5"
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    title="Inspect attached bank UTR remittance slip"
                   >
                     <FileCheck className="w-3.5 h-3.5" />
                     <span>Inspect Bank UTR / Receipt</span>
                   </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200/70 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5 cursor-not-allowed opacity-65"
+                    title="No bank UTR or remittance receipt attached to this invoice yet"
+                  >
+                    <FileCheck className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
+                    <span>Inspect Bank UTR / Receipt</span>
+                  </button>
+                )}
+
+                {invoice.settlementOffer && invoice.settlementOffer.status === 'pending_owner' && onApproveSettlement ? (
+                  <button
+                    type="button"
+                    onClick={() => onApproveSettlement(invoice)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-500 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    title={`Approve discounted settlement offer: ${formatINR(invoice.settlementOffer.discountedAmount)}`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Approve Settlement ({formatINR(invoice.settlementOffer.discountedAmount)})</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200/70 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5 cursor-not-allowed opacity-65"
+                    title="No discounted settlement offer pending on this invoice"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
+                    <span>Approve Settlement</span>
+                  </button>
                 )}
 
                 <button
+                  type="button"
                   onClick={() => onResendNotice(invoice)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Resend Notice</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => onPauseResume(invoice)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   {invoice.status === 'paused' ? (
                     <>
@@ -235,8 +271,9 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => onChangeBucket(invoice)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Clock className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Move</span>
@@ -244,20 +281,12 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
 
                 {customer && (
                   <button
+                    type="button"
                     onClick={() => onInspectRisk(customer)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
                     <span>Risk Profile</span>
-                  </button>
-                )}
-
-                {invoice.settlementOffer && invoice.settlementOffer.status === 'pending_owner' && onApproveSettlement && (
-                  <button
-                    onClick={() => onApproveSettlement(invoice)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-500 flex items-center gap-1.5"
-                  >
-                    <span>Approve</span>
                   </button>
                 )}
               </div>

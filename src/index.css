@@ -17,12 +17,59 @@
   --color-gray-very-dark: #12131d;
   --card-accent: #7c3aed;
   --card-accent-soft: rgba(124, 58, 237, 0.1);
+
+  /* Semantic tokens for shadcn-style components in /components/ui */
+  --ui-background: #ffffff;
+  --ui-foreground: #18181b;
+  --ui-border: #e4e4e7;
+  --ui-muted: #f4f4f5;
+  --ui-muted-foreground: #71717a;
 }
 
 .dark {
   --color-gray-light: rgba(255, 255, 255, 0.1);
   --color-gray-medium: #94a3b8;
   --color-gray-dark: #f8fafc;
+
+  --ui-background: #0d0e15;
+  --ui-foreground: #fafafa;
+  --ui-border: rgba(255, 255, 255, 0.12);
+  --ui-muted: #27272a;
+  --ui-muted-foreground: #a1a1aa;
+}
+
+@layer utilities {
+  /* Tailwind v4 parity: keep focus rings hidden while preserving forced-colors support. */
+  .outline-hidden {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+}
+
+/* Chatbot polish: brand accent strip and actions */
+.ai-chat-widget-card {
+  position: relative;
+}
+
+.ai-chat-widget-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #7c3aed 0%, #9333ea 55%, #c85a2a 100%);
+  z-index: 10;
+}
+
+.ai-chat-widget-card button[aria-label="Send message"] {
+  background: linear-gradient(135deg, #7c3aed, #9333ea);
+  color: #fff;
+  box-shadow: 0 4px 12px -4px rgba(124, 58, 237, 0.65);
+}
+
+.ai-chat-widget-card button[aria-label="Reset conversation"]:hover {
+  color: #7c3aed;
+  border-color: rgba(124, 58, 237, 0.35);
+  background: rgba(124, 58, 237, 0.06);
 }
 
 @layer base {

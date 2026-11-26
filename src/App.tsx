@@ -19,6 +19,7 @@ import {
   isSupabaseConfigured,
 } from './lib/supabase';
 import { OAuthCallbackHandler } from './components/OAuthCallbackHandler';
+import { AIChatWidget } from '@/components/ui/ai-chat-widget';
 
 export function App() {
   // Theme state shared across Landing Page and Dashboard
@@ -284,6 +285,9 @@ export function App() {
           onUpgradeSuccess={handleUpgradeSuccess}
           onRequireAuth={() => handleOpenAuth('signup')}
         />
+
+        {/* Floating AI assistant (n8n-backed chat) */}
+        <AIChatWidget uid={currentUser?.customer_uid || currentUser?.uid || currentUser?.id || ''} />
       </div>
     );
   }
@@ -346,6 +350,9 @@ export function App() {
         onUpgradeSuccess={handleUpgradeSuccess}
         onRequireAuth={() => handleOpenAuth('signup')}
       />
+
+      {/* Floating AI assistant (n8n-backed chat) */}
+      <AIChatWidget uid={currentUser?.customer_uid || currentUser?.uid || currentUser?.id || ''} />
     </div>
   );
 }

@@ -13,6 +13,14 @@ export default {
         mono: ['"JetBrains Mono"', 'monospace'],
       },
       colors: {
+        // shadcn-style semantic tokens used by the copied UI primitives.
+        background: 'var(--ui-background)',
+        foreground: 'var(--ui-foreground)',
+        border: 'var(--ui-border)',
+        muted: {
+          DEFAULT: 'var(--ui-muted)',
+          foreground: 'var(--ui-muted-foreground)',
+        },
         recovr: {
           bg: '#07080D',
           surface: '#0D0E15',

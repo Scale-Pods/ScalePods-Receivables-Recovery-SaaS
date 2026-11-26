@@ -98,11 +98,6 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
           <p className="text-zinc-600 dark:text-zinc-400 text-sm sm:text-base leading-relaxed">
             No commission cuts. No hidden percentage take rates.
           </p>
-          {plans && (
-            <p className="text-[10px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Live prices from recovery_plan_limits
-            </p>
-          )}
 
           {/* Modern Segmented Billing Toggle */}
           <div className="pt-4 flex items-center justify-center">

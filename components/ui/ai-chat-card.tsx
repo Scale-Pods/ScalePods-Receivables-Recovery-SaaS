@@ -178,7 +178,7 @@ export function AIChatCard({
           ) : (
             <div
               onClick={takeOver}
-              className="min-h-10 w-full cursor-text text-left text-sm leading-5 text-muted-foreground"
+              className="h-10 w-full cursor-text overflow-hidden text-left text-sm leading-5 text-muted-foreground"
             >
               {message}
               <motion.span

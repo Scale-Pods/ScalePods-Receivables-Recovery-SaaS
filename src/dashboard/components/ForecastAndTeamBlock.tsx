@@ -1,34 +1,24 @@
 import React from 'react';
 import { 
-  Building2, 
-  Bot, 
   Lock, 
   ArrowRight, 
   TrendingUp, 
   Calendar, 
   CheckCircle2, 
-  ShieldCheck, 
-  Sparkles,
-  Users
+  Sparkles
 } from 'lucide-react';
-import { CashForecastWeek, BusinessEntity, PlanTier } from '../types/dashboard';
-import { mockMonthlyRecoveryReport, mockTeamPerformance } from '../data/mockData';
+import { CashForecastWeek, PlanTier } from '../types/dashboard';
+import { mockMonthlyRecoveryReport } from '../data/mockData';
 import { formatINR } from '../utils/formatters';
 
 interface ForecastAndTeamBlockProps {
   forecast: CashForecastWeek[];
-  entities: BusinessEntity[];
-  selectedEntity: BusinessEntity;
-  onSelectEntity: (entity: BusinessEntity) => void;
   planTier: PlanTier;
   onUpgradePrompt: () => void;
 }
 
 export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
   forecast,
-  entities,
-  selectedEntity,
-  onSelectEntity,
   planTier,
   onUpgradePrompt,
 }) => {
@@ -282,111 +272,6 @@ export const ForecastAndTeamBlock: React.FC<ForecastAndTeamBlockProps> = ({
                 </div>
               );
             })}
-          </div>
-        </div>
-
-        {/* Multi-business Subsidiaries & Team Split */}
-        <div className="dashboard-card p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-zinc-100 dark:border-zinc-800">
-            <div>
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-zinc-500" />
-                <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                  Subsidiary Entities & Recovery Team
-                </h3>
-              </div>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
-                Multi-entity portfolio consolidation and recovery efficiency ratings.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 uppercase">
-                Enterprise Portfolio
-              </span>
-              {!isEnterprise && (
-                <span className="text-[11px] text-zinc-400 font-mono">
-                  (Preview Mode)
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Subsidiary Entities Column */}
-            <div className="space-y-2">
-              <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
-                Portfolio Operating Entities
-              </div>
-              {entities.filter(e => e.id !== 'ent-all').map((ent) => {
-                const isSelected = selectedEntity.id === ent.id;
-                return (
-                  <div
-                    key={ent.id}
-                    onClick={() => onSelectEntity(ent)}
-                    className={`dashboard-card flex cursor-pointer items-center justify-between p-3 ${isSelected ? 'is-selected' : ''}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                        <Building2 className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-xs text-zinc-900 dark:text-white">{ent.name}</div>
-                        <div className="text-[11px] text-zinc-500 font-mono">
-                          Outstanding: {formatINR(ent.totalOutstanding)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right font-mono">
-                      <div className="font-semibold text-xs text-emerald-600 dark:text-emerald-400">
-                        {formatINR(ent.recoveredThisMonth)}
-                      </div>
-                      <div className="text-[10px] text-zinc-500">{ent.collectionRate}% collected</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Team Performance Column */}
-            <div className="space-y-2">
-              <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
-                Recovery Engine & Specialists
-              </div>
-              {mockTeamPerformance.map((tp) => (
-                <div
-                  key={tp.agentName}
-                  className="dashboard-card flex items-center justify-between p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center font-bold text-xs border border-zinc-200 dark:border-zinc-700">
-                      {tp.type === 'AI System' ? (
-                        <Bot className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      ) : (
-                        tp.agentName.charAt(0)
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-bold text-xs text-zinc-900 dark:text-white flex items-center gap-1.5">
-                        <span>{tp.agentName}</span>
-                        <span className="text-[10px] text-zinc-400 font-mono font-normal">({tp.type})</span>
-                      </div>
-                      <div className="text-[11px] text-zinc-500 font-mono">
-                        {tp.invoicesHandled} invoices • {tp.avgRecoveryDays}d avg cycle
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right font-mono">
-                    <div className="font-semibold text-xs text-zinc-900 dark:text-white">
-                      {formatINR(tp.recoveredAmount)}
-                    </div>
-                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                      {tp.efficiencyScore}% efficiency
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

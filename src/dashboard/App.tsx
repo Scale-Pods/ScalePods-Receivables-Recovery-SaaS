@@ -1511,9 +1511,6 @@ export function DashboardView({
             <div className="space-y-6">
               <ForecastAndTeamBlock
                 forecast={mockCashForecast}
-                entities={mockBusinessEntities}
-                selectedEntity={selectedEntity}
-                onSelectEntity={setSelectedEntity}
                 planTier={planTier}
                 onUpgradePrompt={() => handleUpgradePrompt('growth')}
               />

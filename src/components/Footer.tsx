@@ -69,9 +69,6 @@ export const Footer: React.FC = () => {
             <ul className="space-y-2 text-xs">
               <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Privacy Policy</a></li>
               <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Terms of Service</a></li>
-              <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Data Processing Addendum</a></li>
-              <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Section 138 Compliance</a></li>
-              <li><a href="#faq" className="hover:text-zinc-900 dark:hover:text-white transition-colors">RBI Fair Practices Code</a></li>
             </ul>
           </div>
 

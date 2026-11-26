@@ -189,12 +189,6 @@ export const comparisonData = [
     recovr: 'Instant UPI, Virtual Accounts, NEFT, RTGS & Cards',
     traditionalAgency: 'Physical Cheques & manual bank transfers',
     manualExcel: 'Offline checks and prolonged email back-and-forths'
-  },
-  {
-    criteria: 'Legal Notice Escalation',
-    recovr: 'Automated Section 138 / MSME Samadhaan on Day 22',
-    traditionalAgency: 'Requires separate lawyer retainer & court filing costs',
-    manualExcel: 'Rarely executed until overdue exceeds 180 days'
   }
 ];
 
@@ -270,7 +264,6 @@ export const pricingPlans: PricingPlan[] = [
       'Custom AI call minutes volume by contract',
       'Fully customizable workflow builder & AI bucket picker',
       'Self-improving AI timing & tone adaptation',
-      'Section 138 / MSME claim filing & lawyer hand-off',
       'Multi-entity consoles & scheduled PDF reports',
       'Dedicated account manager & SLA guarantee'
     ],

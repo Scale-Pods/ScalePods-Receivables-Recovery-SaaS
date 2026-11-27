@@ -94,7 +94,7 @@ export async function signUpUser(params: {
 
       const { data: domainAccounts, error: domainCheckError } = await supabase
         .from('Credentials')
-        .select('id, Tier, tier, Email')
+        .select('*')
         .or(`Email.ilike.%@${rootDomain},Email.ilike.%.${rootDomain}`);
 
       if (domainCheckError) {
@@ -397,29 +397,49 @@ export async function signOutUser(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY_USER);
 }
 
+interface CredentialFilter {
+  column: string;
+  operator: 'eq' | 'ilike';
+  value: string | number;
+}
+
+async function tryCredentialFilter(
+  filter: CredentialFilter
+): Promise<{ row: any | null; columnExists: boolean }> {
+  if (!supabase) return { row: null, columnExists: false };
+
+  try {
+    // Select every column instead of guessing names: PostgREST returns 400 as
+    // soon as a single select field does not exist, which made the old
+    // multi-column fallback loop fail on every deployment.
+    const query = supabase.from('Credentials').select('*');
+    const { data, error } = await (filter.operator === 'ilike'
+      ? query.ilike(filter.column, String(filter.value))
+      : query.eq(filter.column, filter.value)
+    ).maybeSingle();
+
+    if (error) return { row: null, columnExists: false };
+    return { row: data, columnExists: true };
+  } catch {
+    return { row: null, columnExists: false };
+  }
+}
+
 /**
  * Reads the authoritative account state from Supabase. The browser keeps a
  * cached session in localStorage, so a tier edited directly in the Credentials
  * table would otherwise never be reflected in the UI.
+ *
+ * Each lookup has ordered column alternatives. An alternative is only tried
+ * when the previous column is missing from the schema, not when a valid column
+ * simply has no matching row.
  */
-async function readCredentialsRow(applyFilter: (query: any) => any): Promise<any | null> {
-  if (!supabase) return null;
-
-  // Older tables may only have one of these columns; try each set in order.
-  const columnSets = [
-    'Tier, tier, uid, customer_uid, id',
-    'Tier, uid, customer_uid, id',
-    'tier, uid, customer_uid, id',
-  ];
-
-  for (const columns of columnSets) {
-    try {
-      const { data, error } = await applyFilter(
-        supabase.from('Credentials').select(columns)
-      ).maybeSingle();
-      if (!error && data) return data;
-    } catch {
-      // Column not present in this schema; try the next set.
+async function readCredentialsRow(lookups: CredentialFilter[][]): Promise<any | null> {
+  for (const alternatives of lookups) {
+    for (const filter of alternatives) {
+      const { row, columnExists } = await tryCredentialFilter(filter);
+      if (row) return row;
+      if (columnExists) break;
     }
   }
   return null;
@@ -433,7 +453,7 @@ export async function fetchRemoteAccountState(
   const planTiers: PlanTierType[] = ['free', 'basic', 'growth', 'enterprise'];
 
   const normalize = (row: any) => {
-    const rawTier = row?.Tier ?? row?.tier ?? '';
+    const rawTier = row?.Tier ?? row?.tier ?? row?.plan_tier ?? '';
     const tierValue = String(rawTier).trim().toLowerCase() as PlanTierType;
     const rawUid = row?.customer_uid ?? row?.uid ?? row?.id;
     return {
@@ -443,23 +463,31 @@ export async function fetchRemoteAccountState(
   };
 
   try {
+    const lookups: CredentialFilter[][] = [];
+
     const email = (user.email || '').trim().toLowerCase();
     if (email) {
-      const byEmail = await readCredentialsRow((query) => query.ilike('Email', email));
-      if (byEmail) return normalize(byEmail);
+      lookups.push([
+        { column: 'Email', operator: 'ilike', value: email },
+        { column: 'email', operator: 'ilike', value: email },
+      ]);
     }
 
     const uid = user.customer_uid || user.uid || '';
     if (uid && uid !== 'local_user') {
-      const byUid = await readCredentialsRow((query) => query.eq('uid', uid));
-      if (byUid) return normalize(byUid);
+      lookups.push([
+        { column: 'uid', operator: 'eq', value: uid },
+        { column: 'customer_uid', operator: 'eq', value: uid },
+      ]);
     }
 
     const numericId = Number(user.id);
     if (!Number.isNaN(numericId) && numericId > 0) {
-      const byId = await readCredentialsRow((query) => query.eq('id', numericId));
-      if (byId) return normalize(byId);
+      lookups.push([{ column: 'id', operator: 'eq', value: numericId }]);
     }
+
+    const row = await readCredentialsRow(lookups);
+    return row ? normalize(row) : null;
   } catch (err) {
     console.warn('Unable to refresh account state from Supabase:', err);
   }

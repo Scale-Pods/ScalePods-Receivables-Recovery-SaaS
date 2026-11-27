@@ -113,6 +113,18 @@ export interface SequenceSaveRequest {
   sequence: unknown[];
 }
 
+/**
+ * Serverless hosts (e.g. Vercel) reject request bodies above ~4.5 MB. Base64
+ * adds ~33% overhead, so 3 MB of file bytes is the largest safe upload here.
+ */
+export const MAX_INVOICE_FILE_BYTES = 3 * 1024 * 1024;
+
+export function formatFileSizeLabel(bytes: number): string {
+  return bytes >= 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 async function postJson<T>(url: string, payload: unknown): Promise<T> {
   const response = await fetch(url, {
     method: 'POST',
@@ -122,6 +134,9 @@ async function postJson<T>(url: string, payload: unknown): Promise<T> {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.success === false) {
+    if (response.status === 413) {
+      throw new Error('Invoice file is too large to upload. Maximum size is 3 MB — please compress it and try again.');
+    }
     throw new Error(data?.message || data?.error || `Request failed (${response.status})`);
   }
   return data as T;

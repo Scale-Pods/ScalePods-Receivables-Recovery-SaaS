@@ -4,7 +4,9 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_VERSION = '2023-06-01';
 const DRAFT_TTL_MS = 30 * 60 * 1000;
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
+// Serverless platforms (e.g. Vercel) cap request bodies at ~4.5 MB. Base64
+// inflates file bytes by ~33%, so keep the accepted file size well below that.
+const MAX_FILE_BYTES = 3 * 1024 * 1024;
 const DRAFT_VERSION = 1;
 
 const EXTRACTION_PROMPT = `# SYSTEM PROMPT: INVOICE DATA EXTRACTION AGENT
@@ -631,7 +633,7 @@ async function loadSequence(supabase, context, fallback) {
   if (email) {
     const byEmail = await supabase
       .from('Credentials')
-      .select('Sequence,Tier,uid,Email')
+      .select('*')
       .eq('Email', email)
       .maybeSingle();
     if (!byEmail.error && byEmail.data) row = byEmail.data;
@@ -639,7 +641,7 @@ async function loadSequence(supabase, context, fallback) {
     if (!row) {
       const byLowerEmail = await supabase
         .from('Credentials')
-        .select('Sequence,Tier,uid,Email')
+        .select('*')
         .eq('email', email)
         .maybeSingle();
       if (!byLowerEmail.error && byLowerEmail.data) row = byLowerEmail.data;
@@ -649,16 +651,16 @@ async function loadSequence(supabase, context, fallback) {
   if (!row && uid) {
     const byUid = await supabase
       .from('Credentials')
-      .select('Sequence,Tier,uid,Email')
+      .select('*')
       .eq('uid', uid)
       .maybeSingle();
     if (!byUid.error && byUid.data) row = byUid.data;
   }
 
   return {
-    sequence: normalizeSequence(row?.Sequence || fallback || DEFAULT_SEQUENCE),
-    tier: asText(row?.Tier) || context?.userTier || 'free',
-    uid: asText(row?.uid) || uid || null,
+    sequence: normalizeSequence(row?.Sequence || row?.sequence || fallback || DEFAULT_SEQUENCE),
+    tier: asText(row?.Tier || row?.tier) || context?.userTier || 'free',
+    uid: asText(row?.uid || row?.customer_uid) || uid || null,
     source: row ? 'Credentials' : 'fallback',
   };
 }
@@ -849,7 +851,7 @@ async function handleExtract(req, res, env) {
 
   const bytes = Buffer.from(base64, 'base64');
   if (!bytes.length) throw new Error('Invoice file is empty.');
-  if (bytes.length > MAX_FILE_BYTES) throw new Error('Invoice file exceeds the 10 MB limit.');
+  if (bytes.length > MAX_FILE_BYTES) throw new Error('Invoice file exceeds the 3 MB limit.');
 
   const context = {
     customerEmail: asText(body.customerEmail ?? body.debtorEmail),
@@ -1004,12 +1006,12 @@ async function handleSequenceSave(req, res, env) {
 
   const supabase = getSupabaseClient(env);
   let update = null;
-  if (email) update = await supabase.from('Credentials').update(payload).eq('Email', email).select('Email');
+  if (email) update = await supabase.from('Credentials').update(payload).eq('Email', email).select('*');
   if ((!update || update.error || !update.data?.length) && email) {
-    update = await supabase.from('Credentials').update(payload).eq('email', email).select('email');
+    update = await supabase.from('Credentials').update(payload).eq('email', email).select('*');
   }
   if ((!update || update.error || !update.data?.length) && uid) {
-    update = await supabase.from('Credentials').update(payload).eq('uid', uid).select('uid');
+    update = await supabase.from('Credentials').update(payload).eq('uid', uid).select('*');
   }
   if (!update || update.error) {
     throw new Error(update?.error?.message || 'Unable to update Credentials.Sequence.');

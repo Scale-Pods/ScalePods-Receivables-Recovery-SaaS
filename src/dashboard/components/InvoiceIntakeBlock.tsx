@@ -22,8 +22,10 @@ import {
 import { Invoice, PlanTier, CadenceIntensity } from '../types/dashboard';
 import { UserAccount, STORAGE_KEY_USER } from '../../types/auth';
 import {
+  MAX_INVOICE_FILE_BYTES,
   approveInvoiceDraft,
   extractInvoiceWithWorkflow,
+  formatFileSizeLabel,
   readStoredSequence,
   type ExtractedInvoiceDraft,
   type InvoiceApprovalResult,
@@ -157,9 +159,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   const documentText = activeItem?.documentText ?? null;
   const scannedResult = activeItem?.preview ?? null;
   const batchBytes = batch.reduce((sum, item) => sum + item.file.size, 0);
-  const batchSizeLabel = batchBytes >= 1024 * 1024
-    ? `${(batchBytes / 1024 / 1024).toFixed(1)} MB`
-    : `${Math.max(1, Math.round(batchBytes / 1024))} KB`;
+  const batchSizeLabel = formatFileSizeLabel(batchBytes);
 
   // Edit handlers still use setScannedResult(...); route them to the active file.
   const setScannedResult = (
@@ -536,12 +536,25 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     const list = Array.from(files);
     if (!list.length) return;
 
-    setUploadError(null);
-    const items: BatchItem[] = list.map((file) => ({
+    // Reject oversized files before base64 encoding: serverless APIs cap the
+    // request body size and would otherwise return an opaque 413 response.
+    const oversized = list.filter((file) => file.size > MAX_INVOICE_FILE_BYTES);
+    if (oversized.length) {
+      setUploadError(
+        `${oversized.length} file(s) exceed the ${formatFileSizeLabel(MAX_INVOICE_FILE_BYTES)} upload limit: ${oversized.map((file) => file.name).join(', ')}. Compress them and try again.`
+      );
+    } else {
+      setUploadError(null);
+    }
+
+    const accepted = list.filter((file) => file.size <= MAX_INVOICE_FILE_BYTES);
+    if (!accepted.length) return;
+
+    const items: BatchItem[] = accepted.map((file) => ({
       id: `inv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       file,
       fileName: file.name,
-      fileSize: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+      fileSize: formatFileSizeLabel(file.size),
       documentUrl: URL.createObjectURL(file),
       documentText: null,
       email: '',
@@ -1251,7 +1264,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                         Drop invoice files or <span className="underline font-bold text-purple-600 dark:text-purple-400">browse files</span>
                       </div>
                       <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                        Select one or many files · PDF, PNG, JPG, JPEG, WEBP, CSV and TXT
+                        Select one or many files · PDF, PNG, JPG, JPEG, WEBP, CSV and TXT · Up to {formatFileSizeLabel(MAX_INVOICE_FILE_BYTES)} each
                       </div>
                     </div>
                   ) : (

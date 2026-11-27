@@ -14,6 +14,7 @@ import {
   OutreachFlowStep
 } from '../dashboard/types/dashboard';
 import { normalizeRecoverySequence } from './recoverySchedule';
+import { collectStepDeliveries } from './outreachFields.mjs';
 
 // --------------------------------------------------------------------------
 // Consolidated Recovery Outreach Table
@@ -87,6 +88,7 @@ function parseOutreachFlow(row: any, dueDate: string): OutreachFlow | undefined 
   const normalized = normalizeRecoverySequence(rawSteps);
   if (normalized.length === 0) return undefined;
 
+  const channelCounts: Record<ChannelType, number> = { email: 0, whatsapp: 0, voice: 0 };
   const steps: OutreachFlowStep[] = normalized.map((step, index) => {
     const sourceStep =
       rawSteps.find(
@@ -96,12 +98,22 @@ function parseOutreachFlow(row: any, dueDate: string): OutreachFlow | undefined 
       rawSteps.find((candidate: any) => Number(candidate?.day) === step.day) ||
       rawSteps[index];
 
+    const channels = step.channels as OutreachFlowStep['channels'];
+    const deliveries = collectStepDeliveries(row, channels, channelCounts);
+    const savedDeliveryDate = deliveries.find((delivery) => delivery.sentDate)?.sentDate || '';
+
     return {
       ...step,
-      channels: step.channels as OutreachFlowStep['channels'],
+      channels,
+      // The outreach table is authoritative: if automation rewrote
+      // email_N_date / wa_N_date / call_N_date, show that date even when the
+      // saved sequence config still has the original scheduled_date.
       scheduledDate:
+        savedDeliveryDate ||
         normalizeConfigDate(sourceStep?.scheduled_date) ||
         deriveStepDate(dueDate, step.day),
+      completed: deliveries.some((delivery) => delivery.sent),
+      deliveries,
     };
   });
 

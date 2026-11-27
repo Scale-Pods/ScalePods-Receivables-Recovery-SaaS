@@ -10,7 +10,6 @@ import {
   FileSpreadsheet, 
   Image as ImageIcon,
   Mail,
-  MessageSquare,
   Phone,
   AlertCircle,
   X,
@@ -22,7 +21,6 @@ import {
 import { Invoice, PlanTier, CadenceIntensity } from '../types/dashboard';
 import { UserAccount, STORAGE_KEY_USER } from '../../types/auth';
 import {
-  MAX_INVOICE_FILE_BYTES,
   approveInvoiceDraft,
   extractInvoiceWithWorkflow,
   formatFileSizeLabel,
@@ -31,6 +29,8 @@ import {
   type InvoiceApprovalResult,
   type InvoiceExtractionResult,
 } from '../../lib/invoiceWorkflow';
+import { MAX_RAW_UPLOAD_BYTES, prepareInvoiceUpload } from '../../lib/invoiceFileUpload';
+import WhatsAppLogo from '../../components/WhatsAppLogo';
 import { QuotaUsage } from '../utils/quota';
 import {
   buildRecoverySchedulePreview,
@@ -84,7 +84,6 @@ interface ParsedInvoicePreview {
   gstin: string | null;
   voucherNo: string | null;
   customerCompany: string | null;
-  customerName: string | null;
   customerEmail: string | null;
   customerPhone: string | null;
   amount: number | null;
@@ -140,10 +139,25 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   // Real File Upload States & Ref — one queue powers both single and bulk intake.
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [batch, setBatch] = useState<BatchItem[]>([]);
+  const batchRef = useRef<BatchItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const activeIdRef = useRef<string | null>(null);
+
+  // Keep the refs in sync with state immediately (not just after the next
+  // render) so an approval always targets the invoice the user is looking at.
+  const commitBatch = (next: BatchItem[]) => {
+    batchRef.current = next;
+    setBatch(next);
+  };
+
+  const selectActiveItem = (id: string | null) => {
+    activeIdRef.current = id;
+    setActiveId(id);
+  };
   const [isDragOver, setIsDragOver] = useState(false);
   const auditHideTimerRef = useRef<number | null>(null);
   const extractionGateRef = useRef<{ promise: Promise<void>; finish: () => void } | null>(null);
+  const hasRevealedReadyRef = useRef(false);
   const approvingRef = useRef(false);
   const invoiceFieldRef = useRef<HTMLInputElement>(null);
   const gstinFieldRef = useRef<HTMLInputElement>(null);
@@ -160,22 +174,20 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   const scannedResult = activeItem?.preview ?? null;
   const batchBytes = batch.reduce((sum, item) => sum + item.file.size, 0);
   const batchSizeLabel = formatFileSizeLabel(batchBytes);
+  const readyCount = batch.filter((item) => item.status === 'ready' && item.preview).length;
+  const pendingCount = batch.filter((item) => item.status === 'queued' || item.status === 'extracting').length;
 
   // Edit handlers still use setScannedResult(...); route them to the active file.
   const setScannedResult = (
     value: ParsedInvoicePreview | null | ((prev: ParsedInvoicePreview) => ParsedInvoicePreview)
   ) => {
-    setBatch((prev) =>
-      prev.map((item) =>
-        item.id === activeId && item.preview
-          ? { ...item, preview: typeof value === 'function' ? value(item.preview) : value }
-          : item
-      )
+    const next = batchRef.current.map((item) =>
+      item.id === activeIdRef.current && item.preview
+        ? { ...item, preview: typeof value === 'function' ? value(item.preview) : value }
+        : item
     );
+    commitBatch(next);
   };
-
-  const batchRef = useRef<BatchItem[]>([]);
-  batchRef.current = batch;
 
   useEffect(() => {
     return () => {
@@ -196,6 +208,13 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [auditActivity, setAuditActivity] = useState<AuditActivity | null>(null);
+
+  // A completed invoice can be reviewed immediately even while the remaining
+  // files in the batch are still being extracted.
+  const isActiveItemProcessing = Boolean(
+    isScanning && activeItem && (activeItem.status === 'extracting' || activeItem.status === 'queued')
+  );
+  const showComparison = Boolean(scannedResult && !isActiveItemProcessing);
 
   // Keeps the shared AI loader on screen long enough to be seen even when the
   // extraction endpoint answers (or fails) almost instantly.
@@ -293,11 +312,11 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     );
   }, [previewSequence, scannedResult?.dueDate, scannedResult?.cycleStartedDate]);
 
-  const showSchedulePanel = Boolean(scannedResult?.dueDate) && !isScanning;
+  const showSchedulePanel = showComparison && Boolean(scannedResult?.dueDate);
 
   const getChannelIcon = (channel: RecoveryChannel) => {
     if (channel === 'email') return Mail;
-    if (channel === 'whatsapp') return MessageSquare;
+    if (channel === 'whatsapp') return WhatsAppLogo;
     return Phone;
   };
 
@@ -418,24 +437,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       }
     }
 
-    // 3. Extract Contact Person / Name (Nullable - strictly from text, never fabricated)
-    let customerName: string | null = null;
-    const nameRegexes = [
-      /(?:attn|attention|contact\s*person|contact\s*name|contact|name|client\s*name|poc)\s*[:\-]?\s*([A-Za-z\s.]{3,35})/i,
-      /\b(?:mr\.|ms\.|mrs\.|dr\.)\s+([A-Za-z\s]{3,30})/i,
-    ];
-    for (const rx of nameRegexes) {
-      const m = rawText.match(rx);
-      if (m && m[1]) {
-        const candidate = m[1].trim().split('\n')[0].replace(/[^\w\s.]/g, '').trim();
-        if (candidate.length >= 3 && !/^(total|invoice|date|amount|company)/i.test(candidate)) {
-          customerName = candidate;
-          break;
-        }
-      }
-    }
-
-    // 4. Extract Email (Nullable - from user input or file text, never fabricated)
+    // 3. Extract Email (Nullable - from user input or file text, never fabricated)
     let customerEmail: string | null = null;
     if (userEmail.trim()) {
       customerEmail = userEmail.trim();
@@ -446,7 +448,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       }
     }
 
-    // 5. Extract Phone (Nullable - from user input or file text, never fabricated)
+    // 4. Extract Phone (Nullable - from user input or file text, never fabricated)
     let customerPhone: string | null = null;
     if (userPhone.trim()) {
       customerPhone = userPhone.trim();
@@ -457,7 +459,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       }
     }
 
-    // 6. Extract Amount (Nullable - strictly from document total patterns, never fabricated)
+    // 5. Extract Amount (Nullable - strictly from document total patterns, never fabricated)
     let amount: number | null = null;
     const amountRegexes = [
       /(?:grand\s*total|total\s*amount|amount\s*due|total\s*payable|net\s*amount|balance\s*due|invoice\s*amount|total)\s*[:=]?\s*(?:₹|Rs\.?|INR|\$)?\s*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i,
@@ -474,7 +476,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       }
     }
 
-    // 7. Extract Due Date (Nullable - strictly from text)
+    // 6. Extract Due Date (Nullable - strictly from text)
     let dueDate: string | null = null;
     let daysOverdue = 0;
     const dateRegexes = [
@@ -505,15 +507,14 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       bucket === '15+' ? 'standard' : 'light';
 
     // Calculate genuine extraction confidence based on how many fields were matched
-    const foundFieldsCount = [invoiceNumber, customerCompany, customerName, customerEmail, amount].filter(v => v !== null).length;
-    const confidenceScore = Math.round(35 + (foundFieldsCount / 5) * 64.4);
+    const foundFieldsCount = [invoiceNumber, customerCompany, customerEmail, amount].filter(v => v !== null).length;
+    const confidenceScore = Math.round(35 + (foundFieldsCount / 4) * 64.4);
 
     return {
       invoiceNumber,
       gstin,
       voucherNo: null,
       customerCompany,
-      customerName,
       customerEmail,
       customerPhone,
       amount,
@@ -536,18 +537,18 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     const list = Array.from(files);
     if (!list.length) return;
 
-    // Reject oversized files before base64 encoding: serverless APIs cap the
-    // request body size and would otherwise return an opaque 413 response.
-    const oversized = list.filter((file) => file.size > MAX_INVOICE_FILE_BYTES);
+    // Files are downscaled/re-encoded during scanning. Only reject files that
+    // would be unreasonable to decode in the browser at all.
+    const oversized = list.filter((file) => file.size > MAX_RAW_UPLOAD_BYTES);
     if (oversized.length) {
       setUploadError(
-        `${oversized.length} file(s) exceed the ${formatFileSizeLabel(MAX_INVOICE_FILE_BYTES)} upload limit: ${oversized.map((file) => file.name).join(', ')}. Compress them and try again.`
+        `${oversized.length} file(s) exceed the ${formatFileSizeLabel(MAX_RAW_UPLOAD_BYTES)} upload limit: ${oversized.map((file) => file.name).join(', ')}.`
       );
     } else {
       setUploadError(null);
     }
 
-    const accepted = list.filter((file) => file.size <= MAX_INVOICE_FILE_BYTES);
+    const accepted = list.filter((file) => file.size <= MAX_RAW_UPLOAD_BYTES);
     if (!accepted.length) return;
 
     const items: BatchItem[] = accepted.map((file) => ({
@@ -563,8 +564,8 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       preview: null,
       error: null,
     }));
-    setBatch((prev) => [...prev, ...items]);
-    setActiveId((prev) => prev || items[0].id);
+    commitBatch([...batchRef.current, ...items]);
+    if (!activeIdRef.current) selectActiveItem(items[0].id);
 
     // Text documents can be previewed and their contacts sniffed immediately;
     // PDFs/images get their contacts from the AI extraction result.
@@ -576,7 +577,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
           const text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
           const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
           const phoneMatch = text.match(/(?:\+91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b/);
-          setBatch((prev) => prev.map((entry) => entry.id === item.id ? {
+          commitBatch(batchRef.current.map((entry) => entry.id === item.id ? {
             ...entry,
             documentText: text.slice(0, 20000),
             email: emailMatch?.[0] || entry.email,
@@ -590,23 +591,26 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   };
 
   const updateBatchItem = (id: string, patch: Partial<BatchItem>) => {
-    setBatch((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+    commitBatch(batchRef.current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
 
   const removeBatchItem = (id: string) => {
     const removed = batchRef.current.find((item) => item.id === id);
     if (removed?.documentUrl) URL.revokeObjectURL(removed.documentUrl);
     const next = batchRef.current.filter((item) => item.id !== id);
-    setBatch(next);
-    if (activeId === id) setActiveId(next[0]?.id ?? null);
+    commitBatch(next);
+    if (activeIdRef.current === id) {
+      const nextReady = next.find((item) => item.status === 'ready' && item.preview);
+      selectActiveItem(nextReady?.id ?? next[0]?.id ?? null);
+    }
   };
 
   const resetUploadState = () => {
     batchRef.current.forEach((item) => {
       if (item.documentUrl) URL.revokeObjectURL(item.documentUrl);
     });
-    setBatch([]);
-    setActiveId(null);
+    commitBatch([]);
+    selectActiveItem(null);
     setUploadError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -624,7 +628,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   };
 
   const buildApprovalEdits = (preview: ParsedInvoicePreview): Partial<ExtractedInvoiceDraft> => ({
-    party_name: preview.customerCompany || preview.customerName,
+    party_name: preview.customerCompany,
     email: preview.customerEmail,
     phone: preview.customerPhone,
     gstin: preview.gstin,
@@ -654,7 +658,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     onAddInvoice({
       invoiceNumber: preview.invoiceNumber || `INV-${Date.now().toString().slice(-4)}`,
       customerCompany: preview.customerCompany || 'Unspecified Client',
-      customerName: preview.customerName || 'Accounts Payable',
+      customerName: preview.customerCompany || 'Accounts Payable',
       customerEmail: preview.customerEmail || '',
       customerPhone: preview.customerPhone || '',
       amount: preview.amount ?? 0,
@@ -668,7 +672,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     });
   };
 
-  // Shared approval path for a single review card or the whole ready batch.
+  // Approval path for the currently displayed review card only.
   const approvePreview = async (
     preview: ParsedInvoicePreview,
     itemId: string
@@ -700,7 +704,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       if (!result.inserted) {
         setUploadError(result.message || 'Invoice was not added because it already exists.');
         updateBatchItem(itemId, { preview: { ...preview, isDuplicate: true } });
-        if (activeId === itemId) setActiveId(itemId);
+        if (activeIdRef.current === itemId) selectActiveItem(itemId);
         return false;
       }
 
@@ -738,7 +742,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       gstin: extracted.gstin,
       voucherNo: extracted.voucher_no,
       customerCompany: extracted.party_name,
-      customerName: extracted.customer_name || null,
       customerEmail: extracted.customer_email || extracted.email || item.email || null,
       customerPhone: extracted.phone || item.phone || null,
       amount: extracted.overdue_amount,
@@ -797,9 +800,10 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     }
 
     setUploadError(null);
+    hasRevealedReadyRef.current = false;
     startExtractionAnimation();
     setIsScanning(true);
-    setActiveId(queue[0].id);
+    selectActiveItem(queue[0].id);
     queue.forEach((item) => updateBatchItem(item.id, { status: 'extracting', error: null, preview: null }));
     setAuditActivity({
       fileName: queue.length > 1 ? `${queue.length} invoice files` : queue[0].fileName,
@@ -818,17 +822,14 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
       });
 
       try {
-        const fileBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(item.file);
-        });
-
         updateAuditActivity({ stage: 'parsing' });
 
+        // Decode/compress in-browser so large invoices stay under the API's
+        // serverless body limit without sending the original base64 bytes.
+        const prepared = await prepareInvoiceUpload(item.file);
+
         const result = await extractInvoiceWithWorkflow({
-          fileBase64,
+          documentBlocks: prepared.documentBlocks,
           fileName: item.fileName,
           fileType: item.file.type || 'application/pdf',
           debtorEmail: item.email,
@@ -848,6 +849,12 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
           stage: 'parsed',
         });
         updateBatchItem(item.id, { status: 'ready', preview, error: null });
+        // Reveal the first finished invoice as soon as it is available; later
+        // completions stay in the batch list so the user does not lose context.
+        if (!hasRevealedReadyRef.current) {
+          hasRevealedReadyRef.current = true;
+          selectActiveItem(item.id);
+        }
         if (result.duplicate) duplicateCount += 1;
       } catch (err: any) {
         console.warn('Invoice extraction error:', err);
@@ -872,39 +879,15 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
   };
 
   const handleApproveScanned = async () => {
-    if (!scannedResult || !activeId) return;
-    await approvePreview(scannedResult, activeId);
-  };
-
-  const handleApproveAll = async () => {
-    const ready = batchRef.current.filter((item) => item.status === 'ready' && item.preview);
-    if (!ready.length) return;
-
-    if (quota && !quota.isCustom && ready.length > quota.invoicesRemaining) {
-      setUploadError(`Only ${quota.invoicesRemaining} invoice(s) left in this month's quota. Approve fewer invoices or upgrade your plan.`);
-      return;
-    }
-
-    let approvedCount = 0;
-    for (const item of ready) {
-      const ok = await approvePreview(item.preview!, item.id);
-      if (!ok) break;
-      approvedCount += 1;
-    }
-    if (approvedCount) {
-      setAuditActivity({
-        fileName: `${approvedCount} invoice(s)`,
-        invoiceLabel: 'Batch approved',
-        stage: 'updated',
-      });
-      scheduleAuditHide();
-    }
+    const itemId = activeIdRef.current;
+    const preview = batchRef.current.find((item) => item.id === itemId)?.preview;
+    if (!itemId || !preview) return;
+    await approvePreview(preview, itemId);
   };
 
   // Manual Form States
   const [manualInvoiceNo, setManualInvoiceNo] = useState('');
   const [manualCompany, setManualCompany] = useState('');
-  const [manualContactName, setManualContactName] = useState('');
   const [manualEmail, setManualEmail] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [manualAmount, setManualAmount] = useState<number>(50000);
@@ -937,7 +920,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     onAddInvoice({
       invoiceNumber: manualInvoiceNo,
       customerCompany: manualCompany,
-      customerName: manualContactName || 'Accounts Payable',
+      customerName: manualCompany || 'Accounts Payable',
       customerEmail: manualEmail || 'ap@' + manualCompany.toLowerCase().replace(/[^a-z]/g, '') + '.in',
       customerPhone: manualPhone || '+91 98000 00000',
       amount: Number(manualAmount),
@@ -952,7 +935,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
 
     setManualInvoiceNo('');
     setManualCompany('');
-    setManualContactName('');
     setManualEmail('');
     setManualPhone('');
     setManualAmount(50000);
@@ -993,7 +975,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
     );
   };
 
-  const renderUploadedDocument = (scanning: boolean) => {
+  const renderUploadedDocument = (activeProcessing: boolean) => {
     const lowerName = (selectedFile?.name || '').toLowerCase();
     const isPdf = selectedFile?.type === 'application/pdf' || lowerName.endsWith('.pdf');
     const isImage = selectedFile?.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(lowerName);
@@ -1011,7 +993,11 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                 {batch.length > 1 ? `${batch.length} invoices · ${uploadedFileName}` : (uploadedFileName || 'Uploaded invoice')}
               </div>
               <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
-                {uploadedFileSize} • {scanning ? 'AI extraction in progress' : 'Uploaded document'}
+                {uploadedFileSize} • {isScanning
+                  ? pendingCount > 0
+                    ? `AI extraction · ${readyCount}/${batch.length} ready`
+                    : 'AI extraction in progress'
+                  : 'Uploaded document'}
               </div>
             </div>
           </div>
@@ -1023,7 +1009,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setActiveId(item.id)}
+                onClick={() => selectActiveItem(item.id)}
                 className={`intake-batch-item ${item.id === activeId ? 'is-active' : ''}`}
                 title={item.fileName}
               >
@@ -1037,7 +1023,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
           </div>
         )}
 
-        {!scanning && batch.some((item) => item.status === 'queued' || item.status === 'error') && (
+        {!isScanning && batch.some((item) => item.status === 'queued' || item.status === 'error') && (
           <div className="shrink-0 px-3.5 py-2 border-b border-slate-200 dark:border-white/[0.08] bg-purple-50/40 dark:bg-purple-950/20">
             <button
               type="button"
@@ -1063,7 +1049,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
             isText={isText}
             documentText={documentText}
           />
-          {scanning && (
+          {activeProcessing && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-zinc-950/95 dark:bg-black/95">
               <AiLoader />
               <span className="text-[10px] font-mono text-zinc-300">
@@ -1203,7 +1189,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
           }`}
         >
           {isScanning || batch.length > 0 ? (
-            <div className="intake-workspace-pane document-pane">{renderUploadedDocument(isScanning)}</div>
+            <div className="intake-workspace-pane document-pane">{renderUploadedDocument(isActiveItemProcessing)}</div>
           ) : (
           <div className="intake-workspace-pane form-pane">
             <div className="intake-panel intake-form-card p-4">
@@ -1264,7 +1250,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                         Drop invoice files or <span className="underline font-bold text-purple-600 dark:text-purple-400">browse files</span>
                       </div>
                       <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                        Select one or many files · PDF, PNG, JPG, JPEG, WEBP, CSV and TXT · Up to {formatFileSizeLabel(MAX_INVOICE_FILE_BYTES)} each
+                        Select one or many files · PDF, PNG, JPG, JPEG, WEBP, CSV and TXT · Large files are compressed in your browser
                       </div>
                     </div>
                   ) : (
@@ -1337,12 +1323,18 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                       <Sparkles className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                       <span>Extraction Output</span>
                     </div>
-                    {auditActivity
-                      ? renderAuditActivity()
-                      : scannedResult && <span className="intake-output-badge">Editable</span>}
+                    {isScanning && readyCount > 0 ? (
+                      <span className="intake-output-badge">
+                        {readyCount}/{batch.length} ready · extracting {pendingCount}
+                      </span>
+                    ) : auditActivity ? (
+                      renderAuditActivity()
+                    ) : showComparison ? (
+                      <span className="intake-output-badge">Editable</span>
+                    ) : null}
                   </div>
 
-                  {!isScanning && scannedResult?.isDuplicate && (
+                  {showComparison && scannedResult?.isDuplicate && (
                     <div className="duplicate-alert" role="alert">
                       <span className="duplicate-alert-pulse" />
                       <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1372,7 +1364,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                   )}
                 </div>
 
-                {isScanning && (
+                {isActiveItemProcessing && (
                   <div className="flex-1 flex flex-col items-center justify-center py-10" role="status" aria-live="polite">
                     <div className="text-[11px] text-zinc-600 dark:text-zinc-300 font-mono">
                       {isApproving ? 'Adding invoice & generating dates...' : 'Extracting invoice details...'}
@@ -1380,7 +1372,25 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                   </div>
                 )}
 
-                {!isScanning && !scannedResult && (
+                {!isActiveItemProcessing && !scannedResult && activeItem?.status === 'error' && (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2 py-10 px-4">
+                    <AlertCircle className="w-8 h-8 mx-auto text-rose-500" />
+                    <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">Extraction failed for this file</div>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-xs">
+                      {activeItem.error || 'Try again or remove this file.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handleProcessUpload()}
+                      disabled={isScanning}
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-purple-700 dark:text-purple-300 border border-purple-500/30 bg-purple-500/[0.06] hover:bg-purple-500/[0.12] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      Retry extraction
+                    </button>
+                  </div>
+                )}
+
+                {!isActiveItemProcessing && !scannedResult && activeItem?.status !== 'error' && (
                   <div className="flex-1 flex flex-col items-center justify-center text-center text-zinc-500 dark:text-zinc-400 space-y-1 py-10">
                     <FileText className="w-8 h-8 mx-auto text-zinc-400 dark:text-zinc-600" />
                     <div className="text-xs font-medium text-zinc-700 dark:text-zinc-300">No invoice scanned</div>
@@ -1388,7 +1398,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                   </div>
                 )}
 
-                {!isScanning && scannedResult && (
+                {showComparison && scannedResult && (
                   <div className="space-y-3">
                     <div className={`intake-status-strip flex items-center justify-between text-[11px] ${
                       scannedResult.isAiExtracted
@@ -1442,12 +1452,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                         value: scannedResult.customerCompany,
                         placeholder: 'Add buyer company',
                         onChange: (e) => setScannedResult({ ...scannedResult, customerCompany: e.target.value.trim() || null }),
-                      })}
-                      {renderExtractField({
-                        label: 'Contact Name',
-                        value: scannedResult.customerName,
-                        placeholder: 'Add contact person',
-                        onChange: (e) => setScannedResult({ ...scannedResult, customerName: e.target.value.trim() || null }),
                       })}
                       {renderExtractField({
                         label: 'Email',
@@ -1615,7 +1619,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                 )}
               </div>
 
-              {scannedResult && !isScanning && (
+              {showComparison && scannedResult && (
                 <div className="intake-approval-footer shrink-0">
                   <button
                     onClick={handleApproveScanned}
@@ -1630,21 +1634,10 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                     ) : (
                       <>
                         <Check className="w-3.5 h-3.5" />
-                        <span>Approve & Add to Supabase</span>
+                        <span>Approve</span>
                       </>
                     )}
                   </button>
-                  {batch.filter((item) => item.status === 'ready' && item.preview).length > 1 && (
-                    <button
-                      type="button"
-                      onClick={handleApproveAll}
-                      disabled={isApproving}
-                      className="w-full py-2 rounded-lg font-semibold text-xs text-purple-700 dark:text-purple-300 border border-purple-500/30 bg-purple-500/[0.06] hover:bg-purple-500/[0.12] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <Files className="w-3.5 h-3.5" />
-                      <span>Approve all ready ({batch.filter((item) => item.status === 'ready' && item.preview).length})</span>
-                    </button>
-                  )}
                   {(!scannedResult.customerEmail || !scannedResult.customerPhone) && (
                     <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center">
                       Fill the highlighted email and phone before approving.
@@ -1804,17 +1797,6 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                   placeholder="Company Name"
                   value={manualCompany}
                   onChange={(e) => setManualCompany(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-zinc-700 dark:text-zinc-300 font-mono mb-1">Contact Name</label>
-                <input
-                  type="text"
-                  placeholder="Sarah Jenkins"
-                  value={manualContactName}
-                  onChange={(e) => setManualContactName(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
                 />
               </div>

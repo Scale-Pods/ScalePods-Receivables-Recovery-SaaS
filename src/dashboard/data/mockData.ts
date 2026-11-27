@@ -223,7 +223,7 @@ export const mockChannelPerformances: ChannelPerformance[] = [
   {
     channel: 'whatsapp',
     name: 'WhatsApp Business API',
-    icon: 'MessageSquare',
+    icon: 'WhatsAppLogo',
     touchesSent: 320,
     deliveredPct: 98.1,
     openOrReadPct: 91.8,

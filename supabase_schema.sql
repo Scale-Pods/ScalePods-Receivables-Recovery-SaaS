@@ -325,9 +325,18 @@ declare
   i int;
 begin
   for i in 1..10 loop
-    execute format('alter table public.recovery_outreach add column if not exists email_%s_date date', i);
-    execute format('alter table public.recovery_outreach add column if not exists wa_%s_date date', i);
-    execute format('alter table public.recovery_outreach add column if not exists call_%s_date date', i);
+    -- Text (not date) so automation can append a "Done" marker after sending.
+    execute format('alter table public.recovery_outreach add column if not exists email_%s_date text', i);
+    execute format('alter table public.recovery_outreach add column if not exists wa_%s_date text', i);
+    execute format('alter table public.recovery_outreach add column if not exists call_%s_date text', i);
+    -- Existing installs created these as date columns; widen them to text.
+    execute format('alter table public.recovery_outreach alter column email_%s_date type text using email_%s_date::text', i);
+    execute format('alter table public.recovery_outreach alter column wa_%s_date type text using wa_%s_date::text', i);
+    execute format('alter table public.recovery_outreach alter column call_%s_date type text using call_%s_date::text', i);
+    -- Saved HTML bodies of the outreach that was actually sent for each step.
+    execute format('alter table public.recovery_outreach add column if not exists email_%s_content text', i);
+    execute format('alter table public.recovery_outreach add column if not exists wa_%s_content text', i);
+    execute format('alter table public.recovery_outreach add column if not exists call_%s_content text', i);
   end loop;
 end $$;
 

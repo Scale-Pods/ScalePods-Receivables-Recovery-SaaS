@@ -24,7 +24,6 @@ Do not generate explanations, markdown, comments or additional text.
 Extract the following:
 
 - party_name: Legal business name of the buyer/customer.
-- customer_name: Contact person's name, if explicitly mentioned.
 - email: Customer's email address.
 - customer_email: Customer's email address.
 - phone: Customer's phone/mobile number.
@@ -105,7 +104,6 @@ Extract:
 Return ONE valid JSON object with this exact shape and nothing else:
 {
   "party_name": string | null,
-  "customer_name": string | null,
   "email": string | null,
   "customer_email": string | null,
   "phone": string | null,
@@ -283,14 +281,39 @@ function buildDocumentBlocks(base64, mediaType, fileName) {
   throw new Error('Unsupported file type. Use a PDF, image, CSV, or TXT invoice.');
 }
 
-async function callAnthropic(env, base64, mediaType, fileName) {
+/** Accepts the small blocks prepared by the browser; never trusts arbitrary shapes. */
+export function normalizePreparedBlocks(value) {
+  if (!Array.isArray(value) || !value.length) return null;
+
+  const blocks = value.slice(0, 12).map((block) => {
+    if (!block || typeof block !== 'object') return null;
+    if (block.type === 'text' && typeof block.text === 'string') {
+      return { type: 'text', text: block.text.slice(0, 200000) };
+    }
+    if (
+      block.type === 'image' &&
+      /^image\/(webp|jpeg|png)$/.test(String(block.mediaType || '')) &&
+      typeof block.data === 'string'
+    ) {
+      const data = cleanBase64(block.data);
+      if (data) {
+        return { type: 'image', source: { type: 'base64', media_type: block.mediaType, data } };
+      }
+    }
+    return null;
+  }).filter(Boolean);
+
+  return blocks.length ? blocks : null;
+}
+
+async function callAnthropic(env, base64, mediaType, fileName, preparedBlocks = null) {
   const apiKey = envValue(env, 'ANTHROPIC_API_KEY') || envValue(env, 'VITE_ANTHROPIC_API_KEY');
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY is not configured on the server.');
   }
 
   const model = envValue(env, 'ANTHROPIC_MODEL') || DEFAULT_ANTHROPIC_MODEL;
-  const blocks = buildDocumentBlocks(base64, mediaType, fileName);
+  const blocks = preparedBlocks || buildDocumentBlocks(base64, mediaType, fileName);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -846,12 +869,18 @@ export function buildRecoveryRow({
 
 async function handleExtract(req, res, env) {
   const body = await readJsonBody(req);
+  const preparedBlocks = normalizePreparedBlocks(body.documentBlocks);
   const base64 = cleanBase64(body.fileBase64);
-  if (!base64) throw new Error('Invoice file bytes are missing.');
 
-  const bytes = Buffer.from(base64, 'base64');
-  if (!bytes.length) throw new Error('Invoice file is empty.');
-  if (bytes.length > MAX_FILE_BYTES) throw new Error('Invoice file exceeds the 3 MB limit.');
+  // Browser-compressed uploads arrive as text/image blocks instead of the raw
+  // file, so they bypass the 3 MB base64 payload limit.
+  if (!preparedBlocks && !base64) throw new Error('Invoice file bytes are missing.');
+
+  if (base64) {
+    const bytes = Buffer.from(base64, 'base64');
+    if (!bytes.length) throw new Error('Invoice file is empty.');
+    if (bytes.length > MAX_FILE_BYTES) throw new Error('Invoice file exceeds the 3 MB limit.');
+  }
 
   const context = {
     customerEmail: asText(body.customerEmail ?? body.debtorEmail),
@@ -869,7 +898,7 @@ async function handleExtract(req, res, env) {
   // document (or leaves them blank for the user to fill in on the review card).
 
   const mediaType = normalizeMediaType(body.fileType, body.fileName);
-  const modelText = await callAnthropic(env, base64, mediaType, body.fileName);
+  const modelText = await callAnthropic(env, base64, mediaType, body.fileName, preparedBlocks);
   const modelJson = parseModelJson(modelText);
   const extracted = normalizeExtracted(modelJson, context);
 

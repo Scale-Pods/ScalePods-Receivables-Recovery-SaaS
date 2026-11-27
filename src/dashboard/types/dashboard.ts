@@ -53,6 +53,16 @@ export interface CustomerProfile {
   }[];
 }
 
+export interface OutreachDelivery {
+  channel: ChannelType;
+  /** 1-based occurrence of this channel within the sequence. */
+  index: number;
+  rawDate: string;
+  sentDate: string;
+  sent: boolean;
+  contentHtml: string;
+}
+
 export interface OutreachFlowStep {
   id?: string;
   /** Positive days are days overdue; negative days fall before the due date. */
@@ -62,6 +72,9 @@ export interface OutreachFlowStep {
   channels: ChannelType[];
   headline: string;
   scheduledDate: string;
+  /** True when the saved channel date contains a Done marker. */
+  completed?: boolean;
+  deliveries?: OutreachDelivery[];
 }
 
 export interface OutreachFlow {

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  MessageSquare, 
   PhoneCall, 
   Mail, 
   Send, 
@@ -12,6 +11,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { PlanTier } from '../types/dashboard';
+import WhatsAppLogo from '../../components/WhatsAppLogo';
 
 interface OmnichannelSimulatorBlockProps {
   planTier: PlanTier;
@@ -156,7 +156,7 @@ export const OmnichannelSimulatorBlock: React.FC<OmnichannelSimulatorBlockProps>
                 : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
-            <MessageSquare className="w-3.5 h-3.5" />
+            <WhatsAppLogo className="w-3.5 h-3.5" />
             <span>WhatsApp</span>
           </button>
           <button

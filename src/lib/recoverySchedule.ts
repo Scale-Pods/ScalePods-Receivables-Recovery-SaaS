@@ -104,9 +104,9 @@ export function formatRecoveryStepTiming(day: number): string {
   return `${Math.abs(day)} days before due date`;
 }
 
-/** Compact badge used in the schedule list. */
+/** Compact day label used in the schedule list. */
 export function formatRecoveryStepBadge(day: number): string {
-  if (day > 0) return `D${day}`;
+  if (day > 0) return `Day ${day}`;
   const weeks = Math.abs(day) / 7;
   if (Number.isInteger(weeks) && weeks >= 1) return `${weeks}w before`;
   return `${Math.abs(day)}d before`;

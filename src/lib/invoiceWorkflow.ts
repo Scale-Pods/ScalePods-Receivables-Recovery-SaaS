@@ -89,8 +89,15 @@ export interface InvoiceApprovalResult {
   sequence_source?: string;
 }
 
+export type InvoiceDocumentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mediaType: 'image/webp' | 'image/jpeg' | 'image/png'; data: string };
+
 export interface InvoiceExtractionRequest {
-  fileBase64: string;
+  /** Raw file bytes are only used when no pre-compressed blocks are supplied. */
+  fileBase64?: string;
+  /** Browser-prepared text/image blocks, kept under the serverless body limit. */
+  documentBlocks?: InvoiceDocumentBlock[];
   fileName: string;
   fileType: string;
   debtorEmail: string;
@@ -114,8 +121,9 @@ export interface SequenceSaveRequest {
 }
 
 /**
- * Serverless hosts (e.g. Vercel) reject request bodies above ~4.5 MB. Base64
- * adds ~33% overhead, so 3 MB of file bytes is the largest safe upload here.
+ * Serverless hosts (e.g. Vercel) reject request bodies above ~4.5 MB. This is
+ * the base64 payload budget used by the browser-side compressor; raw files are
+ * decoded/re-encoded here before they ever reach the API.
  */
 export const MAX_INVOICE_FILE_BYTES = 3 * 1024 * 1024;
 
@@ -135,7 +143,7 @@ async function postJson<T>(url: string, payload: unknown): Promise<T> {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.success === false) {
     if (response.status === 413) {
-      throw new Error('Invoice file is too large to upload. Maximum size is 3 MB — please compress it and try again.');
+      throw new Error('Invoice is too large to upload even after compression. Try a smaller file or fewer pages.');
     }
     throw new Error(data?.message || data?.error || `Request failed (${response.status})`);
   }

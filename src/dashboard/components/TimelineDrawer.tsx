@@ -26,6 +26,7 @@ import { CompanyAvatar } from './CompanyAvatar';
 import { InvoiceOutreachFlow } from './InvoiceOutreachFlow';
 import { readStoredSequence } from '../../lib/invoiceWorkflow';
 import { buildRecoverySchedulePreview, defaultRecoverySequence } from '../../lib/recoverySchedule';
+import WhatsAppLogo from '../../components/WhatsAppLogo';
 
 interface TimelineDrawerProps {
   invoice: Invoice | null;
@@ -68,6 +69,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
       case 'email_sent':
         return <Mail className="w-3.5 h-3.5 text-zinc-400" />;
       case 'whatsapp_sent':
+        return <WhatsAppLogo className="w-3.5 h-3.5" />;
       case 'customer_reply':
         return <MessageSquare className="w-3.5 h-3.5 text-emerald-500" />;
       case 'voice_call':

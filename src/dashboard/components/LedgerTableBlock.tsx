@@ -5,7 +5,6 @@ import {
   CheckCircle2, 
   Clock, 
   AlertTriangle, 
-  MessageSquare, 
   PhoneCall, 
   Mail, 
   ChevronRight,
@@ -23,6 +22,7 @@ import { InfoHint } from '@/components/ui/info-hint';
 import { formatINR } from '../utils/formatters';
 import { CompanyAvatar } from './CompanyAvatar';
 import { CustomerRiskExplainerModal } from './CustomerRiskExplainerModal';
+import WhatsAppLogo from '../../components/WhatsAppLogo';
 
 interface LedgerTableBlockProps {
   invoices: Invoice[];
@@ -210,7 +210,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
   const getChannelIcon = (ch: Invoice['lastTouch']['channel']) => {
     switch (ch) {
       case 'whatsapp':
-        return <MessageSquare className="w-4 h-4 text-zinc-400 dark:text-zinc-500 flex-shrink-0" />;
+        return <WhatsAppLogo className="w-4 h-4 flex-shrink-0" />;
       case 'voice':
         return <PhoneCall className="w-4 h-4 text-zinc-400 dark:text-zinc-500 flex-shrink-0" />;
       case 'email':

@@ -9,6 +9,7 @@ import {
   getScheduleStartDate,
   normalizeDate,
   normalizeExtracted,
+  normalizePreparedBlocks,
   normalizeSequence,
   parsePaymentTermsDays,
 } from '../server/invoiceWorkflow.js';
@@ -343,5 +344,32 @@ test('duplicate lookup falls back to the logged-in account email', async () => {
     supabase.queries.every((filters) =>
       filters.some(([column]) => column === 'customer_uid' || column === 'customer_email')
     )
+  );
+});
+
+test('prepared browser blocks are accepted and normalized for Anthropic', () => {
+  const blocks = normalizePreparedBlocks([
+    { type: 'text', text: 'Invoice 123\nTotal 5000' },
+    {
+      type: 'image',
+      mediaType: 'image/webp',
+      data: 'data:image/webp;base64,UklGRiQAAABJRU5E',
+    },
+    { type: 'document', source: { type: 'base64', data: 'ignored' } },
+  ]);
+
+  assert.equal(blocks.length, 2);
+  assert.equal(blocks[0].type, 'text');
+  assert.equal(blocks[1].type, 'image');
+  assert.equal(blocks[1].source.media_type, 'image/webp');
+  assert.equal(blocks[1].source.data, 'UklGRiQAAABJRU5E');
+});
+
+test('prepared blocks reject unsupported media types and empty input', () => {
+  assert.equal(normalizePreparedBlocks(null), null);
+  assert.equal(normalizePreparedBlocks([]), null);
+  assert.equal(
+    normalizePreparedBlocks([{ type: 'image', mediaType: 'application/pdf', data: 'abc' }]),
+    null
   );
 });

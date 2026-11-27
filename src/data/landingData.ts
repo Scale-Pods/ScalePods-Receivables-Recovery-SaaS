@@ -112,7 +112,7 @@ export const channelFeatures = [
     title: 'Interactive WhatsApp Business API',
     subtitle: '94% open rate within 5 minutes',
     description: 'Deliver rich interactive cards with instant Razorpay UPI links, NEFT Virtual Accounts, and quick-reply action buttons.',
-    iconName: 'MessageSquare',
+    iconName: 'WhatsAppLogo',
     accentColor: 'from-emerald-500/20 to-teal-500/5',
     borderColor: 'border-emerald-500/30',
     bulletPoints: [

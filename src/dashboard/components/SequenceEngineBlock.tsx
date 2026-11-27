@@ -6,7 +6,6 @@ import {
   Flame,
   Lock,
   Mail,
-  MessageSquare,
   Minus,
   PhoneCall,
   Plus,
@@ -20,6 +19,7 @@ import { PlanTier } from '../types/dashboard';
 import { UserAccount } from '../../types/auth';
 import { saveSequenceToSupabase } from '../../lib/invoiceWorkflow';
 import { fetchPlanLimits, getPlanRow, type PlanLimitRow } from '../../lib/planLimits';
+import WhatsAppLogo from '../../components/WhatsAppLogo';
 
 export type SequenceChannel = 'email' | 'whatsapp' | 'voice';
 export type SequenceType = 'light' | 'standard' | 'intensive' | 'custom';
@@ -87,11 +87,11 @@ const CHANNEL_META: Array<{
   id: SequenceChannel;
   label: string;
   shortLabel: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string }>;
   requiredTier: PlanTier;
 }> = [
   { id: 'email', label: 'Email', shortLabel: 'Email', icon: Mail, requiredTier: 'free' },
-  { id: 'whatsapp', label: 'WhatsApp', shortLabel: 'WhatsApp', icon: MessageSquare, requiredTier: 'basic' },
+  { id: 'whatsapp', label: 'WhatsApp', shortLabel: 'WhatsApp', icon: WhatsAppLogo, requiredTier: 'basic' },
   { id: 'voice', label: 'Call', shortLabel: 'Call', icon: PhoneCall, requiredTier: 'growth' },
 ];
 

@@ -1,7 +1,6 @@
 import React from 'react';
 import { 
   Mail, 
-  MessageSquare, 
   PhoneCall, 
   Lock, 
   ArrowRight, 
@@ -12,6 +11,7 @@ import {
 } from 'lucide-react';
 import { ChannelPerformance, PlanTier } from '../types/dashboard';
 import { formatINR } from '../utils/formatters';
+import WhatsAppLogo from '../../components/WhatsAppLogo';
 
 interface StagesAndChannelsBlockProps {
   channels: ChannelPerformance[];
@@ -76,7 +76,7 @@ export const StagesAndChannelsBlock: React.FC<StagesAndChannelsBlockProps> = ({
       case 'email':
         return <Mail className="w-4 h-4 text-zinc-600 dark:text-zinc-300" />;
       case 'whatsapp':
-        return <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+        return <WhatsAppLogo className="w-4 h-4" />;
       case 'voice':
         return <PhoneCall className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
     }

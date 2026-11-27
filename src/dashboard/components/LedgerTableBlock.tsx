@@ -294,7 +294,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                 }`}
               >
                 <span>{b === 'all' ? (viewTab === 'active' ? 'All Active' : 'All Settled') : b}</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/20 text-current">
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-white/20 dark:text-current border border-slate-200/60 dark:border-transparent">
                   {count}
                 </span>
               </button>
@@ -305,7 +305,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
         {/* Search & Status Filter */}
         <div className="flex items-center gap-2">
           <div className="relative w-full sm:w-60">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 dark:text-zinc-400" />
             <input
               type="text"
               placeholder="Search customer, invoice..."
@@ -393,7 +393,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                 <th className="py-3.5 px-4 font-semibold text-right min-w-[140px]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60 text-sm">
+            <tbody className="divide-y divide-slate-200/70 dark:divide-zinc-800/60 text-sm">
               {sorted.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-zinc-500 text-sm">
@@ -410,7 +410,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                     <tr
                       key={inv.id}
                       onClick={() => onRowClick(inv)}
-                      className="hover:bg-purple-50/35 dark:hover:bg-zinc-800/40 transition-colors cursor-pointer divide-x divide-slate-100 dark:divide-zinc-800/60"
+                      className="hover:bg-purple-50/40 dark:hover:bg-zinc-800/40 transition-colors cursor-pointer divide-x divide-slate-200/70 dark:divide-zinc-800/60"
                     >
                       {/* Customer / Company - Monogram avatar + details */}
                       <td className="py-3.5 px-4">
@@ -488,7 +488,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                                 {inv.lastTouch.action}
                               </span>
                             </div>
-                            <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                            <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono font-medium mt-0.5">
                               {inv.lastTouch.timestamp}
                             </div>
                           </div>
@@ -501,7 +501,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                           {inv.hasProofFile && (
                             <button
                               onClick={() => onViewProof(inv)}
-                              className="px-2.5 py-1 rounded-md text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                              className="px-2.5 py-1 rounded-md text-xs font-semibold bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-700 transition-colors shadow-2xs cursor-pointer"
                             >
                               Proof
                             </button>
@@ -510,7 +510,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
                           {!isPaid ? (
                             <button
                               onClick={() => onMarkPaid(inv)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 transition-opacity"
+                              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
                             >
                               Mark Paid
                             </button>
@@ -522,7 +522,7 @@ export const LedgerTableBlock: React.FC<LedgerTableBlockProps> = ({
 
                           <button
                             onClick={() => onRowClick(inv)}
-                            className="p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                            className="p-1 rounded text-zinc-500 hover:text-zinc-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800 transition-colors"
                             title="Timeline"
                           >
                             <ChevronRight className="w-4 h-4" />

@@ -221,7 +221,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                 <button
                   onClick={() => handlePay(false)}
                   disabled={isProcessingPayment}
-                  className="w-full py-2.5 rounded-lg font-semibold text-xs text-white bg-recovr-button hover:bg-recovr-button-hover transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="w-full py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <CreditCard className="w-3.5 h-3.5" />
                   <span>{isProcessingPayment ? 'Processing via Razorpay...' : `Pay ${formatINR(invoice.amount)}`}</span>
@@ -255,7 +255,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                 <button
                   onClick={() => handlePay(true)}
                   disabled={isProcessingPayment}
-                  className="w-full py-2.5 rounded-lg font-semibold text-xs text-white bg-recovr-button hover:bg-recovr-button-hover transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="w-full py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <CreditCard className="w-3.5 h-3.5" />
                   <span>{isProcessingPayment ? 'Processing...' : `Pay ${formatINR(partAmount)}`}</span>
@@ -329,7 +329,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                 <button
                   onClick={handleConfirmDispute}
                   disabled={!disputeText.trim()}
-                  className="w-full py-2.5 rounded-lg text-xs font-semibold bg-recovr-button text-white hover:bg-recovr-button-hover transition-colors disabled:opacity-50"
+                  className="w-full py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 text-white hover:opacity-95 shadow-md shadow-purple-600/30 transition-all cursor-pointer disabled:opacity-50"
                 >
                   Submit Dispute
                 </button>

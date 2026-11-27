@@ -1028,7 +1028,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
             <button
               type="button"
               onClick={() => void handleProcessUpload()}
-              className="w-full py-2 rounded-lg font-bold text-xs text-white bg-recovr-button hover:bg-recovr-button-hover transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              className="w-full py-2 rounded-lg font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>
@@ -1293,7 +1293,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
                 <button
                   type="submit"
                   disabled={isScanning || batch.length === 0}
-                  className="w-full py-2.5 rounded-xl font-bold text-xs text-white bg-recovr-button hover:bg-recovr-button-hover transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isScanning ? (
                     <span>Extracting invoice details...</span>
@@ -1870,7 +1870,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
             <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
               <button
                 type="submit"
-                className="px-4 py-2 rounded-lg font-semibold text-xs text-white bg-zinc-900 dark:bg-white dark:text-zinc-900 hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-sm"
+                className="px-4 py-2 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/30 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Invoice</span>
@@ -1892,7 +1892,7 @@ export const InvoiceIntakeBlock: React.FC<InvoiceIntakeBlockProps> = ({
             {planTier === 'free' && (
               <button
                 onClick={() => onUpgradePrompt('growth')}
-                className="px-3 py-1 rounded-lg text-xs font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 cursor-pointer"
+                className="px-3 py-1 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 shadow-sm shadow-purple-600/25 cursor-pointer"
               >
                 Upgrade to Basic+
               </button>

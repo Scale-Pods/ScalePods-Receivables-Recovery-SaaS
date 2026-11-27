@@ -126,7 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 border-b border-slate-200/90 dark:border-zinc-800/60">
         <button
           onClick={() => setActiveTab('intake')}
-          className={`w-full py-2 px-3.5 rounded-xl text-sm font-semibold text-white bg-recovr-button hover:bg-recovr-button-hover transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
+          className={`w-full py-2 px-3.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/30 hover:shadow-purple-600/40 transition-all flex items-center justify-center gap-2 cursor-pointer ${
             isCollapsed ? 'px-1' : ''
           }`}
           title="Add Invoice"

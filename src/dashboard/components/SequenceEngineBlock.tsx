@@ -167,7 +167,7 @@ const NumberStepper: React.FC<NumberStepperProps> = ({
         onClick={() => step(-1)}
         disabled={value <= min}
         aria-label={`Decrease ${label}`}
-        className="flex h-full w-8 items-center justify-center border-r border-purple-500/15 text-zinc-500 transition-colors hover:bg-recovr-button/10 hover:text-recovr-button disabled:cursor-not-allowed disabled:opacity-30 dark:border-purple-400/10 dark:text-zinc-400 dark:hover:text-purple-300"
+        className="flex h-full w-8 items-center justify-center border-r border-purple-500/15 text-zinc-500 transition-colors hover:bg-purple-500/10 hover:text-purple-600 disabled:cursor-not-allowed disabled:opacity-30 dark:border-purple-400/10 dark:text-zinc-400 dark:hover:text-purple-300"
       >
         <Minus className="h-3.5 w-3.5" />
       </button>
@@ -193,7 +193,7 @@ const NumberStepper: React.FC<NumberStepperProps> = ({
         onClick={() => step(1)}
         disabled={value >= max}
         aria-label={`Increase ${label}`}
-        className="flex h-full w-8 items-center justify-center border-l border-purple-500/15 text-zinc-500 transition-colors hover:bg-recovr-button/10 hover:text-recovr-button disabled:cursor-not-allowed disabled:opacity-30 dark:border-purple-400/10 dark:text-zinc-400 dark:hover:text-purple-300"
+        className="flex h-full w-8 items-center justify-center border-l border-purple-500/15 text-zinc-500 transition-colors hover:bg-purple-500/10 hover:text-purple-600 disabled:cursor-not-allowed disabled:opacity-30 dark:border-purple-400/10 dark:text-zinc-400 dark:hover:text-purple-300"
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
@@ -311,7 +311,7 @@ const ChannelSelect: React.FC<ChannelSelectProps> = ({ value, options, counts, o
                 }}
                 className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] font-semibold transition-colors ${
                   selected
-                    ? 'bg-recovr-button text-white'
+                    ? 'bg-purple-600 text-white shadow-xs'
                     : 'text-zinc-700 hover:bg-purple-500/10 hover:text-purple-700 dark:text-zinc-200 dark:hover:text-purple-300'
                 } ${maxed ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
               >
@@ -1011,7 +1011,7 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
             className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-md transition-all cursor-pointer disabled:cursor-wait disabled:opacity-80 ${
               saveSuccess
                 ? 'bg-emerald-600 shadow-emerald-600/30'
-                : 'bg-recovr-button shadow-recovr-button/30 hover:bg-recovr-button-hover'
+                : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/30'
             }`}
           >
             {isSaving ? (
@@ -1083,7 +1083,7 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
                         <Icon className="h-4 w-4" />
                       </span>
                       {active ? (
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-recovr-button text-white">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-600 text-white shadow-xs">
                           <Check className="h-3 w-3" />
                         </span>
                       ) : !allowed ? (
@@ -1193,7 +1193,7 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
                     onClick={() => applyPreDueWeeks(weeks)}
                     className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors cursor-pointer ${
                       active
-                        ? 'border-recovr-button bg-recovr-button/10 text-recovr-button dark:text-purple-300'
+                        ? 'border-purple-600 bg-purple-500/10 text-purple-700 dark:text-purple-300 font-bold'
                         : 'border-zinc-200 bg-white/70 text-zinc-700 hover:border-purple-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-200 dark:hover:border-purple-400/40'
                     }`}
                   >
@@ -1267,7 +1267,7 @@ export const SequenceEngineBlock: React.FC<SequenceEngineBlockProps> = ({
                   <button
                     type="button"
                     onClick={addCustomStep}
-                    className="flex items-center gap-1.5 rounded-xl bg-recovr-button px-3 py-2 text-[11px] font-bold text-white transition-colors hover:bg-recovr-button-hover cursor-pointer"
+                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/25 px-3 py-2 text-[11px] font-bold text-white transition-all cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     {customSteps.length === 0 ? 'Start with your sequence' : 'Add next step'}

@@ -102,6 +102,8 @@ interface ChartPalette {
   pulseColor: string
   baseAccent: string
   cardText: string
+  cardBg?: string
+  cardBorder?: string
   updatedText: string
   titleText: string
   captionText: string
@@ -141,6 +143,8 @@ const DARK_PALETTE: ChartPalette = {
   pulseColor: PULSE_COLOR,
   baseAccent: BASE_ACCENT,
   cardText: "#fff",
+  cardBg: "transparent",
+  cardBorder: "none",
   updatedText: "#99a3b6",
   titleText: "#9298a5",
   captionText: "#9299a8",
@@ -167,49 +171,51 @@ const DARK_PALETTE: ChartPalette = {
 const LIGHT_PALETTE: ChartPalette = {
   fieldFill: "#ffffff",
   fieldShades: [
-    { shape: [0.38, 0.16, 0.58, 0.34, 0.18], color: "#f7f3ff", opacity: 0.7 },
-    { shape: [0.78, 0.06, 0.42, 0.28, -0.42], color: "#faf7ff", opacity: 0.55 },
-    { shape: [0.18, 0.92, 0.85, 0.32, 0.5], color: "#fdfcff", opacity: 0.45 },
-    { shape: [0.62, 0.55, 0.5, 0.45, -0.2], color: "#f3edff", opacity: 0.18 },
+    { shape: [0.47, 0.82, 0.75, 0.88, 0.7], color: "#f8f9ff", opacity: 0.9 },
+    { shape: [0.38, 0.16, 0.58, 0.34, 0.18], color: "#ede9fe", opacity: 0.45 },
+    { shape: [0.78, 0.06, 0.42, 0.28, -0.42], color: "#f3e8ff", opacity: 0.35 },
+    { shape: [0.18, 0.92, 0.85, 0.32, 0.5], color: "#f5f3ff", opacity: 0.5 },
   ],
   fieldRims: [
-    { shape: [0.12, -0.03, 0.055], color: "#ddd6fe", opacity: 0.5 },
-    { shape: [0.065, -0.015, 0.022], color: "#ede9fe", opacity: 0.6 },
-    { shape: [0.035, -0.012, 0.016], color: "#ffffff", opacity: 0.5 },
+    { shape: [0.12, -0.03, 0.055], color: "#c4b5fd", opacity: 0.55 },
+    { shape: [0.065, -0.015, 0.022], color: "#ddd6fe", opacity: 0.65 },
+    { shape: [0.035, -0.012, 0.016], color: "#ede9fe", opacity: 0.75 },
   ],
-  halo: { cx: 0.5, cy: 0.6, sx: 0.26, sy: 0.26, opacity: 0.14, color: "#7c3aed" },
+  halo: { cx: 0.5, cy: 0.6, sx: 0.26, sy: 0.26, opacity: 0.22, color: "#8b5cf6" },
   backdrop: "#ffffff",
-  gridColor: "#7c3aed",
-  gridAlpha: 0.06,
+  gridColor: "#cbd5e1",
+  gridAlpha: 0.35,
   lineColor: "#7c3aed",
-  dotTop: "#5b21b6",
+  dotTop: "#6d28d9",
   dotMid: "#8b5cf6",
-  dotBottom: "#ddd6fe",
+  dotBottom: "#c4b5fd",
   dotGlow: "#8b5cf6",
-  pulseColor: "#a78bfa",
-  baseAccent: "#a78bfa",
-  cardText: "#4c1d95",
-  updatedText: "#7c3aed",
-  titleText: "#6b7280",
-  captionText: "#7c3aed",
-  valueText: "#4c1d95",
-  periodText: "#6d28d9",
-  pillBg: "rgba(124,58,237,0.05)",
-  pillText: "#6d28d9",
-  pillChevron: "#7c3aed",
-  menuBg: "rgba(255,255,255,0.96)",
-  menuBorder: "rgba(124,58,237,0.14)",
-  menuText: "#6d28d9",
-  menuActiveText: "#4c1d95",
-  menuActiveBg: "rgba(124,58,237,0.07)",
-  menuHoverBg: "rgba(124,58,237,0.04)",
-  checkStroke: "#6d28d9",
-  readoutBg: "rgba(255,255,255,0.96)",
-  readoutBorder: "rgba(124,58,237,0.14)",
-  readoutLabel: "#7c3aed",
-  trendUp: "#7c3aed",
+  pulseColor: "#8b5cf6",
+  baseAccent: "#8b80c4",
+  cardText: "#0f172a",
+  cardBg: "#ffffff",
+  cardBorder: "1px solid #e2e8f0",
+  updatedText: "#64748b",
+  titleText: "#475569",
+  captionText: "#64748b",
+  valueText: "#0f172a",
+  periodText: "#334155",
+  pillBg: "#f1f5f9",
+  pillText: "#334155",
+  pillChevron: "#64748b",
+  menuBg: "#ffffff",
+  menuBorder: "#e2e8f0",
+  menuText: "#475569",
+  menuActiveText: "#7c3aed",
+  menuActiveBg: "#f5f3ff",
+  menuHoverBg: "#f8fafc",
+  checkStroke: "#7c3aed",
+  readoutBg: "#ffffff",
+  readoutBorder: "#e2e8f0",
+  readoutLabel: "#64748b",
+  trendUp: "#16a34a",
   trendDown: "#ef4444",
-  shadow: "0 14px 35px -20px rgba(76,29,149,0.18)",
+  shadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 10px 25px -12px rgba(124, 58, 237, 0.12)",
 }
 
 const MONTH_DATA = [60, 75, 91, 110, 120, 122, 116, 106, 96, 89, 88, 95, 112, 150, 339, 384, 400, 388, 318, 240, 182, 146, 126, 117, 115, 117, 121, 127, 134, 143]
@@ -988,7 +994,20 @@ export function PeakChart({
     <div
       ref={cardRef}
       data-peak-chart=""
-      style={{ position: "relative", width, height: width * HN, borderRadius: px(CR), flex: "none", fontFamily: font, color: palette.cardText, boxShadow: palette.shadow, userSelect: "none", WebkitUserSelect: "none" }}
+      style={{
+        position: "relative",
+        width,
+        height: width * HN,
+        borderRadius: px(CR),
+        flex: "none",
+        fontFamily: font,
+        color: palette.cardText,
+        backgroundColor: palette.cardBg,
+        border: palette.cardBorder,
+        boxShadow: palette.shadow,
+        userSelect: "none",
+        WebkitUserSelect: "none",
+      }}
     >
       <canvas
         ref={canvasRef}
@@ -1003,7 +1022,7 @@ export function PeakChart({
         onPointerCancel={onLeave}
         style={{ position: "absolute", left: 0, top: px(96), width: "100%", height: px(330), touchAction: "pan-y", cursor: "crosshair" }}
       />
-      <p data-part="updated" style={{ ...textBase, left: px(45.6), top: px(43.6), fontSize: px(18.6), fontStretch: "107.7%", fontWeight: 200, color: palette.updatedText }}>{updatedText}</p>
+      <p data-part="updated" style={{ ...textBase, left: px(45.6), top: px(43.6), fontSize: px(18.6), fontStretch: "107.7%", fontWeight: isDark ? 200 : 500, color: palette.updatedText }}>{updatedText}</p>
 
       {infoText && (
         <button
@@ -1030,11 +1049,13 @@ export function PeakChart({
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         style={{
-          position: "absolute", right: px(46), top: px(35), height: px(37), borderRadius: px(18.5), border: 0, padding: `0 ${px(19.8)} 0 ${px(19.4)}`,
+          position: "absolute", right: px(46), top: px(35), height: px(37), borderRadius: px(18.5),
+          border: isDark ? 0 : "1px solid #e2e8f0",
+          padding: `0 ${px(19.8)} 0 ${px(19.4)}`,
           display: "flex", alignItems: "flex-start", gap: px(6.72), background: palette.pillBg, cursor: "pointer", color: palette.pillText, fontFamily: font, outlineOffset: 2,
         }}
       >
-        <span data-part="period" style={{ ...textBase, position: "relative", display: "block", marginTop: px(10.6), fontSize: px(17.2), fontStretch: "115%", fontWeight: 200, color: palette.periodText }}>{current}</span>
+        <span data-part="period" style={{ ...textBase, position: "relative", display: "block", marginTop: px(10.6), fontSize: px(17.2), fontStretch: "115%", fontWeight: isDark ? 200 : 600, color: palette.periodText }}>{current}</span>
         <svg viewBox="0 0 12 7" aria-hidden style={{ flex: "none", marginTop: px(15.9), width: px(12), height: px(7), overflow: "visible", transition: "transform .2s ease", transform: open ? "rotate(180deg)" : "none" }}>
           <path d="M0.8 0.8 L6 6 L11.2 0.8" fill="none" stroke={palette.pillChevron} strokeWidth={1.25} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         </svg>
@@ -1094,9 +1115,9 @@ export function PeakChart({
         <span ref={readLabRef} style={{ fontSize: px(12.5), color: palette.readoutLabel }} />
       </div>
 
-      <p data-part="title" style={{ ...textBase, left: 0, right: 0, textAlign: "center", top: px(441.4), fontSize: px(20.2), fontStretch: "115%", fontWeight: 200, color: palette.titleText }}>{title}</p>
+      <p data-part="title" style={{ ...textBase, left: 0, right: 0, textAlign: "center", top: px(441.4), fontSize: px(20.2), fontStretch: "115%", fontWeight: isDark ? 200 : 600, color: palette.titleText }}>{title}</p>
       <div ref={numRef} style={{ position: "absolute", left: 0, right: 0, top: px(469), display: "flex", justifyContent: "center", opacity: 0 }}>
-        <div data-part="value" style={{ position: "relative", fontFamily: font, fontWeight: 500, fontSize: px(89.2), lineHeight: 1, letterSpacing: px(-0.5), whiteSpace: "nowrap", marginLeft: px(-8.5) }}>
+        <div data-part="value" style={{ position: "relative", fontFamily: font, fontWeight: isDark ? 500 : 700, fontSize: px(89.2), lineHeight: 1, letterSpacing: px(-0.5), whiteSpace: "nowrap", marginLeft: px(-8.5) }}>
           <span style={{ position: "relative", display: "inline-block", fontVariantNumeric: "tabular-nums", fontStretch: "106%" }}>
             <span style={{ visibility: "hidden" }}>{finalDigits}</span>
             <span ref={digitsRef} style={{ position: "absolute", right: 0, top: 0 }}>{finalDigits}</span>
@@ -1114,7 +1135,7 @@ export function PeakChart({
           )}
         </div>
       </div>
-      <p data-part="caption" style={{ ...textBase, left: 0, right: 0, textAlign: "center", top: px(560.9), fontSize: px(11.6), fontStretch: "108%", fontWeight: 250, color: palette.captionText }}>{caption}</p>
+      <p data-part="caption" style={{ ...textBase, left: 0, right: 0, textAlign: "center", top: px(560.9), fontSize: px(11.6), fontStretch: "108%", fontWeight: isDark ? 250 : 500, color: palette.captionText }}>{caption}</p>
     </div>
   )
 

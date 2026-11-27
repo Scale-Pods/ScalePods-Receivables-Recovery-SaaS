@@ -153,9 +153,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               {/* Upgrade Tier Button */}
               <button
                 onClick={onOpenUpgrade}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-zinc-800 dark:text-white bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/30 transition-all cursor-pointer flex items-center gap-1.5 hover:scale-[1.02]"
               >
-                <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <Sparkles className="w-3.5 h-3.5 text-purple-200" />
                 <span>Upgrade</span>
               </button>
 
@@ -205,7 +205,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {currentUser ? (
             <button
               onClick={onOpenUpgrade}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-recovr-button capitalize"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-sm shadow-purple-600/30 capitalize"
             >
               {currentUser.planTier}
             </button>
@@ -219,7 +219,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
               <button
                 onClick={() => onOpenAuth('signup')}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-recovr-button whitespace-nowrap"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-sm shadow-purple-600/30 whitespace-nowrap"
               >
                 Create Account
               </button>
@@ -293,9 +293,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setMobileMenuOpen(false);
                       onOpenUpgrade();
                     }}
-                    className="w-full py-2.5 rounded-xl text-xs font-semibold text-zinc-800 dark:text-white bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-center border border-slate-200 dark:border-zinc-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                    className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-center transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-purple-600/25"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                    <Sparkles className="w-3.5 h-3.5 text-purple-200" />
                     <span>Upgrade</span>
                   </button>
                   <button

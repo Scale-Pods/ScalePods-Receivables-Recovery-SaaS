@@ -154,32 +154,32 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
 
   if (!entitlements) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-        <div className="w-full max-w-md glass-card rounded-2xl border border-purple-500/30 bg-[#0C0D18] p-7 text-center text-white shadow-2xl space-y-4 relative">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/85 backdrop-blur-sm">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-purple-500/30 bg-white dark:bg-[#0C0D18] p-7 text-center text-zinc-900 dark:text-white shadow-2xl space-y-4 relative">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors cursor-pointer"
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
             aria-label="Close upgrade modal"
           >
             <X className="w-5 h-5" />
           </button>
           {pricingError ? (
             <>
-              <h3 className="text-lg font-bold">Live pricing unavailable</h3>
-              <p className="text-xs text-zinc-400">
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Live pricing unavailable</h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
                 Plan prices could not be loaded from the server. No cached prices are shown.
               </p>
               <button
                 onClick={loadPlans}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-recovr-button cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/30 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" /> Retry
               </button>
             </>
           ) : (
             <>
-              <Loader2 className="w-7 h-7 animate-spin text-purple-400 mx-auto" />
-              <h3 className="text-lg font-bold">Loading live plan pricing...</h3>
+              <Loader2 className="w-7 h-7 animate-spin text-purple-600 dark:text-purple-400 mx-auto" />
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Loading live plan pricing...</h3>
             </>
           )}
         </div>
@@ -344,9 +344,9 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 dark:bg-black/85 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-5xl glass-card rounded-2xl border border-purple-500/30 p-5 sm:p-7 text-white shadow-2xl relative overflow-hidden bg-[#0C0D18] max-h-[92vh] overflow-y-auto my-auto"
+        className="w-full max-w-5xl rounded-2xl border border-slate-200 dark:border-purple-500/30 p-5 sm:p-7 text-zinc-900 dark:text-white shadow-2xl relative overflow-hidden bg-white dark:bg-[#0C0D18] max-h-[92vh] overflow-y-auto my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Gradient Line */}
@@ -355,7 +355,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
         {/* Close Button */}
         <button
           onClick={isComplete ? handleUpgradeAcknowledged : onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors cursor-pointer"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
           aria-label="Close upgrade modal"
         >
           <X className="w-5 h-5" />
@@ -364,28 +364,28 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
         {!isComplete ? (
           <div>
             {/* Header with Active Tier and Annual Switcher */}
-            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-zinc-800/80 pb-5">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center">
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
                     Plan Tiers & Entitlements
                   </h2>
                 </div>
-                <p className="text-xs text-zinc-400 font-mono">
-                  Active Tier: <span className="text-purple-400 font-bold uppercase">{currentTier}</span> • {currentUser.companyName}
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+                  Active Tier: <span className="text-purple-600 dark:text-purple-400 font-bold uppercase">{currentTier}</span> • {currentUser.companyName}
                 </p>
               </div>
 
               {/* Monthly vs Annual Toggle */}
-              <div className="inline-flex items-center p-1 rounded-xl bg-zinc-900 border border-zinc-800 text-xs self-start sm:self-auto">
+              <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setBillingAnnual(false)}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-                    !billingAnnual ? 'bg-recovr-button text-white font-bold shadow-md' : 'text-zinc-400 hover:text-white'
+                    !billingAnnual ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-md shadow-purple-600/25' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
                   }`}
                 >
                   Monthly
@@ -394,12 +394,12 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                   type="button"
                   onClick={() => setBillingAnnual(true)}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                    billingAnnual ? 'bg-recovr-button text-white font-bold shadow-md' : 'text-zinc-400 hover:text-white'
+                    billingAnnual ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-md shadow-purple-600/25' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
                   }`}
                 >
                   <span>Annual</span>
                   {annualDiscountPercent > 0 && (
-                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/20">
                       -{annualDiscountPercent}% OFF
                     </span>
                   )}
@@ -423,20 +423,20 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                     onClick={() => handlePlanCardClick(p)}
                     className={`rounded-2xl border p-4 flex flex-col justify-between transition-all cursor-pointer relative ${
                       isSelected
-                        ? 'border-purple-500 bg-purple-600/15 shadow-xl shadow-purple-950/40 ring-1 ring-purple-500/50'
+                        ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-600/15 shadow-md shadow-purple-500/10 ring-1 ring-purple-500/50'
                         : isActive
-                          ? 'border-emerald-500/40 bg-emerald-950/10'
-                          : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900/90'
+                          ? 'border-emerald-500 bg-emerald-50/60 dark:border-emerald-500/40 dark:bg-emerald-950/10'
+                          : 'border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/20 dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/90 shadow-xs'
                     }`}
                   >
                     <div>
                       {/* Name & Badge */}
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-sm text-white">{p.name}</span>
+                        <span className="font-bold text-sm text-zinc-900 dark:text-white">{p.name}</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
                           p.isPopular
-                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 font-bold'
-                            : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                            ? 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/40 font-bold'
+                            : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700'
                         }`}>
                           {p.badge}
                         </span>
@@ -444,47 +444,47 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
 
                       {/* Price Display */}
                       <div className="mb-3">
-                        <span className="text-2xl font-bold font-mono text-white">{price}</span>
-                        <span className="text-[10px] text-zinc-400 ml-1 font-mono">
+                        <span className="text-2xl font-bold font-mono text-zinc-900 dark:text-white">{price}</span>
+                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 ml-1 font-mono">
                           /{p.id === 'free' ? 'forever' : billingAnnual ? 'year' : 'month'}
                         </span>
                       </div>
 
                       {/* Entitlements Specs List */}
-                      <div className="space-y-2 text-[11px] text-zinc-300 font-mono border-t border-zinc-800 pt-3">
+                      <div className="space-y-2 text-[11px] text-zinc-700 dark:text-zinc-300 font-mono border-t border-slate-100 dark:border-zinc-800 pt-3">
                         <div>
                           <span className="text-zinc-500 block text-[10px]">Volume:</span>
-                          <strong className="text-zinc-200">{p.invoiceQuota}</strong>
+                          <strong className="text-zinc-800 dark:text-zinc-200 font-semibold">{p.invoiceQuota}</strong>
                         </div>
                         <div>
                           <span className="text-zinc-500 block text-[10px]">Channels:</span>
-                          <span className="text-zinc-300">{p.channels}</span>
+                          <span className="text-zinc-700 dark:text-zinc-300">{p.channels}</span>
                         </div>
                         <div>
                           <span className="text-zinc-500 block text-[10px]">Voice Minutes:</span>
-                          <span className={p.callMinutes !== 'None' ? 'text-purple-400 font-bold' : 'text-zinc-500'}>
+                          <span className={p.callMinutes !== 'None' ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-zinc-400 dark:text-zinc-500'}>
                             {p.callMinutes}
                           </span>
                         </div>
                         <div>
                           <span className="text-zinc-500 block text-[10px]">Sequences:</span>
-                          <span className="text-zinc-300">{p.sequences}</span>
+                          <span className="text-zinc-700 dark:text-zinc-300">{p.sequences}</span>
                         </div>
                         <div>
                           <span className="text-zinc-500 block text-[10px]">AI Engine:</span>
-                          <span className="text-zinc-400">{p.aiFeatures}</span>
+                          <span className="text-zinc-600 dark:text-zinc-400">{p.aiFeatures}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Card Footer Button */}
-                    <div className="pt-4 mt-4 border-t border-zinc-800">
+                    <div className="pt-4 mt-4 border-t border-slate-100 dark:border-zinc-800">
                       {isActive ? (
-                        <div className="w-full py-2 rounded-xl text-xs font-mono font-bold text-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+                        <div className="w-full py-2 rounded-xl text-xs font-mono font-bold text-center text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
                           Active Current Plan ✓
                         </div>
                       ) : isSelected ? (
-                        <div className="w-full py-2 rounded-xl text-xs font-bold text-center text-white bg-recovr-button shadow-md shadow-recovr-button/30">
+                        <div className="w-full py-2 rounded-xl text-xs font-bold text-center text-white bg-gradient-to-r from-purple-600 to-indigo-600 shadow-md shadow-purple-600/30">
                           Selected for Upgrade ✓
                         </div>
                       ) : (
@@ -494,7 +494,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                             e.stopPropagation();
                             handlePlanCardClick(p);
                           }}
-                          className="w-full py-2 rounded-xl text-xs font-semibold text-center text-zinc-300 bg-zinc-800 hover:bg-recovr-button hover:text-white transition-colors cursor-pointer"
+                          className="w-full py-2 rounded-xl text-xs font-semibold text-center text-zinc-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-purple-600 hover:text-white transition-colors cursor-pointer border border-slate-200/80 dark:border-transparent"
                         >
                           Select {p.name}
                         </button>
@@ -507,18 +507,18 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
 
             {/* PAYMENT & CHECKOUT STEP: ONLY THEN CAN USER SWITCH */}
             {!isSelectedCurrent && (
-              <form onSubmit={handleConfirmSwitch} className="rounded-2xl border border-purple-500/30 bg-purple-950/15 p-5 sm:p-6 space-y-4">
+              <form onSubmit={handleConfirmSwitch} className="rounded-2xl border border-purple-200/90 dark:border-purple-500/30 bg-purple-50/50 dark:bg-purple-950/15 p-5 sm:p-6 space-y-4 shadow-xs">
                 
                 {/* Summary Banner */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-200/60 dark:border-zinc-800 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                       <CreditCard className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-white flex items-center gap-2">
+                      <div className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                         <span>Payment for {targetPlan.name} Tier</span>
-                        <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">
+                        <span className="text-xs px-2 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 font-mono font-semibold">
                           {billingAnnual
                             ? targetDiscountPercent > 0
                               ? `Annual Billing (-${targetDiscountPercent}%)`
@@ -526,23 +526,23 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
                             : 'Monthly Billing'}
                         </span>
                       </div>
-                      <div className="text-xs text-zinc-400 font-mono mt-0.5">
-                        Subscriber: <strong className="text-zinc-200">{currentUser.companyName}</strong> ({currentUser.email})
+                      <div className="text-xs text-zinc-600 dark:text-zinc-400 font-mono mt-0.5">
+                        Subscriber: <strong className="text-zinc-800 dark:text-zinc-200">{currentUser.companyName}</strong> ({currentUser.email})
                       </div>
                     </div>
                   </div>
 
                   <div className="text-left sm:text-right">
-                    <div className="text-2xl font-black font-mono text-white">
+                    <div className="text-2xl font-black font-mono text-zinc-900 dark:text-white">
                       {formattedPrice}
                       {!isCustomPrice && !isFreePlan && (
-                        <span className="text-xs font-normal text-zinc-400 ml-1">
+                        <span className="text-xs font-normal text-zinc-500 dark:text-zinc-400 ml-1">
                           {billingAnnual ? '/yr' : '/mo'}
                         </span>
                       )}
                     </div>
                     {!isCustomPrice && !isFreePlan && (
-                      <div className="text-[10px] text-zinc-400 font-mono">
+                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
                         {billingAnnual
                           ? targetDiscountPercent > 0
                             ? `₹${targetPlan.annualPrice.toLocaleString('en-IN')}/year total (Saved ₹${Math.max(0, targetPlan.monthlyPrice * 12 - targetPlan.annualPrice).toLocaleString('en-IN')})`
@@ -555,7 +555,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
 
                 {/* If Free Tier: confirmation note */}
                 {isFreePlan && (
-                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs">
                     Switching to the <strong>Free Tier</strong> will restrict monthly recovery to {targetPlan.invoiceQuota} and email-only reminders. No payment is charged.
                   </div>
                 )}
@@ -588,30 +588,30 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
             )}
 
             {isSelectedCurrent && (
-              <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-center text-xs text-zinc-400 font-mono">
-                You are currently active on the <strong className="text-white">{targetPlan.name} Tier</strong>. Select any other tier in the matrix above to view payment options and upgrade.
+              <div className="p-4 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-center text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+                You are currently active on the <strong className="text-zinc-900 dark:text-white">{targetPlan.name} Tier</strong>. Select any other tier in the matrix above to view payment options and upgrade.
               </div>
             )}
           </div>
         ) : (
           /* CONFIRMATION SUCCESS VIEW */
           <div className="py-8 text-center space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
               <Check className="w-8 h-8 stroke-[3]" />
             </div>
 
-            <h3 className="text-2xl font-black text-white">
+            <h3 className="text-2xl font-black text-zinc-900 dark:text-white">
               Your plan has been upgraded!
             </h3>
 
-            <p className="text-xs text-zinc-300 max-w-md mx-auto leading-relaxed">
-              <strong>{currentUser.companyName}</strong> is now on the <strong className="text-purple-300">{targetPlan.name} Tier</strong>.
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 max-w-md mx-auto leading-relaxed">
+              <strong className="text-zinc-900 dark:text-white">{currentUser.companyName}</strong> is now on the <strong className="text-purple-600 dark:text-purple-300">{targetPlan.name} Tier</strong>.
               Your higher limits and plan features are ready.
             </p>
 
             {upgradeOrderId && (
               <p className="text-[11px] font-mono text-zinc-500">
-                Order ID: <span className="text-zinc-300">{upgradeOrderId}</span>
+                Order ID: <span className="text-zinc-700 dark:text-zinc-300">{upgradeOrderId}</span>
               </p>
             )}
 
@@ -620,7 +620,7 @@ export const TierPurchaseModal: React.FC<TierPurchaseModalProps> = ({
             ) : isCustomPrice ? (
               <p className="text-[11px] text-zinc-500">Enterprise activation has been requested.</p>
             ) : isWebhookConfirmed ? (
-              <p className="text-[11px] text-emerald-400">Payment verified by ScalePods.</p>
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">Payment verified by ScalePods.</p>
             ) : (
               <p className="text-[11px] text-zinc-500">Payment received. Plan activation is being synced.</p>
             )}

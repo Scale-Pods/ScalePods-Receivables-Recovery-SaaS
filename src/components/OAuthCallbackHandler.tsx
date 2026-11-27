@@ -140,7 +140,7 @@ export const OAuthCallbackHandler: React.FC<OAuthCallbackHandlerProps> = ({ onCo
 
             <button
               onClick={onComplete}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-recovr-button hover:bg-recovr-button-hover text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 text-white text-xs font-semibold shadow-md shadow-purple-600/30 transition-all cursor-pointer"
             >
               <span>Go to Dashboard Now</span>
               <ArrowRight className="w-4 h-4" />

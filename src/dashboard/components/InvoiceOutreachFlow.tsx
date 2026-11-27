@@ -77,13 +77,13 @@ const STATE_STYLES: Record<StepState, { label: string; className: string; ring: 
   },
   upcoming: {
     label: 'Upcoming',
-    className: 'border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 text-zinc-300',
-    ring: 'border-zinc-300 text-zinc-600 dark:border-zinc-600 dark:text-zinc-300',
+    className: 'border-slate-200 bg-white text-slate-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300',
+    ring: 'border-slate-300 text-slate-600 dark:border-zinc-600 dark:text-zinc-300',
   },
   unscheduled: {
     label: 'Unscheduled',
-    className: 'border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400',
-    ring: 'border-zinc-300 text-zinc-500 dark:border-zinc-600 dark:text-zinc-400',
+    className: 'border-slate-200 bg-slate-50 text-slate-600 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400',
+    ring: 'border-slate-300 text-slate-500 dark:border-zinc-600 dark:text-zinc-400',
   },
 };
 
@@ -111,7 +111,7 @@ export const InvoiceOutreachFlow: React.FC<InvoiceOutreachFlowProps> = ({ flow, 
   return (
     <div>
       <div className="mb-2.5 flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-[11px] font-mono font-semibold uppercase tracking-wider text-zinc-400">
+        <span className="flex items-center gap-1.5 text-[11px] font-mono font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
           <GitBranch className="h-3.5 w-3.5" />
           Outreach Sequence Flow
         </span>
@@ -122,13 +122,13 @@ export const InvoiceOutreachFlow: React.FC<InvoiceOutreachFlowProps> = ({ flow, 
               Paused
             </span>
           )}
-          <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
             {sourceLabel}
           </span>
         </div>
       </div>
 
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-3">
+      <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-3 shadow-xs">
         <div className="mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
           <span className="inline-flex items-center gap-1">
             <CalendarDays className="h-3 w-3" />
@@ -176,7 +176,7 @@ export const InvoiceOutreachFlow: React.FC<InvoiceOutreachFlowProps> = ({ flow, 
                         ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10'
                         : state === 'today'
                           ? 'border-violet-500/40 bg-violet-500/[0.06]'
-                          : 'border-zinc-200 bg-white/80 dark:border-zinc-800 dark:bg-zinc-900/60'
+                          : 'border-slate-200 bg-white hover:bg-slate-50/80 dark:border-zinc-800 dark:bg-zinc-900/60 shadow-xs'
                     } ${hasContent ? 'cursor-pointer hover:brightness-[0.98]' : 'cursor-default'}`}
                   >
                     <span
@@ -188,7 +188,7 @@ export const InvoiceOutreachFlow: React.FC<InvoiceOutreachFlowProps> = ({ flow, 
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="min-w-0 truncate text-xs font-semibold text-zinc-800 dark:text-zinc-100" title={step.headline}>
+                        <p className="min-w-0 truncate text-xs font-semibold text-zinc-900 dark:text-zinc-100" title={step.headline}>
                           {step.headline}
                         </p>
                         <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">

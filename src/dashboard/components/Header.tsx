@@ -40,7 +40,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {/* Upgrade Button */}
         <button
           onClick={handleUpgradeClick}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-recovr-button to-recovr-button-hover hover:opacity-95 shadow-md shadow-recovr-button/30 transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-purple-600/35 hover:shadow-purple-600/50 transition-all cursor-pointer"
           title="Upgrade Plan Tier"
         >
           <Sparkles className="w-3.5 h-3.5" />

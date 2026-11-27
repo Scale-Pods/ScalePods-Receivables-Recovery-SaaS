@@ -28,8 +28,8 @@ export default {
           border: 'rgba(255, 255, 255, 0.08)',
           accent: '#7C3AED',
           orange: '#C85A2A',
-          button: '#9D93C2',
-          'button-hover': '#8B80C4',
+          button: '#8B5CF6',
+          'button-hover': '#7C3AED',
         }
       },
       boxShadow: {

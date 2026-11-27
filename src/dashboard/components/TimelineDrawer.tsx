@@ -143,10 +143,10 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm flex justify-end animate-in fade-in duration-150">
       
       {/* Drawer */}
-      <div className="relative w-full max-w-5xl bg-white dark:bg-[#101014] border-l border-zinc-200 dark:border-zinc-800 shadow-2xl h-full flex flex-col z-10 overflow-hidden">
+      <div className="relative w-full max-w-5xl bg-white dark:bg-[#101014] border-l border-slate-200 dark:border-zinc-800 shadow-2xl h-full flex flex-col z-10 overflow-hidden">
         
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-white dark:bg-[#101014]">
           <div className="flex items-center gap-3">
             <CompanyAvatar name={invoice.customerCompany} logoUrl={invoice.avatarUrl} size="lg" />
             <div>
@@ -166,7 +166,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -189,16 +189,16 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
           <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
             {/* Sequence column: stays on the left of the invoice details on desktop. */}
             {outreachFlow && (
-              <aside className="max-h-[45vh] w-full shrink-0 overflow-y-auto border-b border-zinc-200 bg-zinc-50/40 p-4 dark:border-zinc-800 dark:bg-zinc-950/40 lg:max-h-none lg:w-[340px] lg:border-b-0 lg:border-r">
+              <aside className="max-h-[45vh] w-full shrink-0 overflow-y-auto border-b border-slate-200 bg-slate-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/40 lg:max-h-none lg:w-[340px] lg:border-b-0 lg:border-r">
                 <InvoiceOutreachFlow flow={outreachFlow} invoice={invoice} />
               </aside>
             )}
 
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 text-xs">
             {/* Overview Card */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-4 flex items-center justify-between">
+            <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-900/40 p-4 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-[11px] font-mono uppercase text-zinc-400">Amount Due</span>
+                <span className="text-[11px] font-mono uppercase font-semibold text-zinc-500 dark:text-zinc-400">Amount Due</span>
                 <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-white tabular-nums">
                   {formatINR(invoice.amount)}
                 </div>
@@ -208,7 +208,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
               </div>
 
               <div className="text-right">
-                <span className="text-[11px] font-mono uppercase text-zinc-400">Current Bucket</span>
+                <span className="text-[11px] font-mono uppercase font-semibold text-zinc-500 dark:text-zinc-400">Current Bucket</span>
                 <div className="text-xs font-bold font-mono text-zinc-900 dark:text-white">
                   {invoice.bucket.toUpperCase()}
                 </div>
@@ -220,14 +220,14 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
 
             {/* Owner Actions */}
             <div>
-              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 block mb-2 font-semibold">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-2 font-semibold">
                 Owner Controls
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {!isPaid && (
                   <button
                     onClick={() => onMarkPaid(invoice)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 flex items-center gap-1.5"
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 flex items-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>Mark Paid (Leaves Bucket)</span>
@@ -248,7 +248,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                   <button
                     type="button"
                     disabled
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200/70 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5 cursor-not-allowed opacity-65"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-zinc-800 bg-slate-100/80 dark:bg-zinc-900/50 text-slate-400 dark:text-zinc-500 flex items-center gap-1.5 cursor-not-allowed opacity-75"
                     title="No bank UTR or remittance receipt attached to this invoice yet"
                   >
                     <FileCheck className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
@@ -270,7 +270,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                   <button
                     type="button"
                     disabled
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200/70 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5 cursor-not-allowed opacity-65"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-zinc-800 bg-slate-100/80 dark:bg-zinc-900/50 text-slate-400 dark:text-zinc-500 flex items-center gap-1.5 cursor-not-allowed opacity-75"
                     title="No discounted settlement offer pending on this invoice"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
@@ -281,7 +281,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => onResendNotice(invoice)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 hover:bg-slate-50 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Resend Notice</span>
@@ -290,7 +290,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => onPauseResume(invoice)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 hover:bg-slate-50 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   {invoice.status === 'paused' ? (
                     <>
@@ -308,7 +308,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => onChangeBucket(invoice)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 hover:bg-slate-50 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Clock className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Move</span>
@@ -317,16 +317,16 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
             </div>
 
             {/* Risk Profile: score + reason only, shown directly in the card. */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-4">
+            <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-900/40 p-4 shadow-xs">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">
                   Risk Profile
                 </span>
                 <div className="flex items-baseline gap-1 font-mono">
                   <span className="text-xl font-bold text-zinc-900 dark:text-white">
                     {invoice.riskScore}
                   </span>
-                  <span className="text-[10px] text-zinc-400">/ 100</span>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400">/ 100</span>
                 </div>
               </div>
               <p className="mt-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
@@ -336,7 +336,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
 
             {/* Proof Slip Preview Card */}
             {invoice.hasProofFile && invoice.proofFile && (
-              <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-4">
+              <div className="rounded-xl border border-emerald-200/80 dark:border-zinc-800 bg-emerald-50/40 dark:bg-zinc-900/40 p-4 shadow-xs">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <FileCheck className="w-4 h-4 text-emerald-500" />
@@ -355,7 +355,7 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
 
                 <button
                   onClick={() => onViewProof(invoice)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <span>View Proof</span>
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -365,26 +365,26 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
 
             {/* Audit Timeline */}
             <div>
-              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 block mb-3 font-semibold">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-3 font-semibold">
                 Audit Timeline & System Actions
               </span>
 
-              <div className="relative pl-5 space-y-4 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-[1px] before:bg-zinc-200 dark:before:bg-zinc-800">
+              <div className="relative pl-5 space-y-4 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-[1px] before:bg-slate-200 dark:before:bg-zinc-800">
                 {sortedTimeline.map((evt) => (
                   <div key={evt.id} className="relative">
-                    <div className="absolute -left-5 top-1 w-3 h-3 rounded-full bg-zinc-200 dark:bg-zinc-800 border-2 border-white dark:border-[#101014]" />
+                    <div className="absolute -left-5 top-1 w-3 h-3 rounded-full bg-slate-100 dark:bg-zinc-800 border-2 border-purple-500 dark:border-purple-400" />
 
                     <div className="flex items-center justify-between text-xs mb-0.5">
                       <span className="font-medium text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
                         {getTimelineIcon(evt.type)}
                         <span>{evt.title}</span>
                       </span>
-                      <span className="text-[10px] font-mono text-zinc-400">
+                      <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 font-medium">
                         {formatTimelineTimestamp(evt.timestamp)}
                       </span>
                     </div>
 
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                       {evt.description}
                     </p>
                   </div>
@@ -395,11 +395,11 @@ export const TimelineDrawer: React.FC<TimelineDrawerProps> = ({
           </div>
         )}
 
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-400">
+        <div className="p-4 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-[#101014]">
           <span className="font-mono">Autonomous Engine</span>
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-slate-50 shadow-xs cursor-pointer"
           >
             Close
           </button>

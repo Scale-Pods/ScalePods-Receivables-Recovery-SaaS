@@ -136,7 +136,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
                       <span className="font-mono text-sm font-bold text-zinc-900 dark:text-white">{pack.price}</span>
                       <button
                         onClick={() => onApplyTopUp(pack.invoices, 0, pack.name)}
-                        className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-recovr-button hover:bg-recovr-button-hover text-white cursor-pointer transition-colors"
+                        className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-sm shadow-purple-600/30 text-white cursor-pointer transition-all"
                       >
                         Add to Quota
                       </button>
